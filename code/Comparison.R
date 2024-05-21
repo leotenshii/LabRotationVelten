@@ -52,7 +52,7 @@ hvgs <- rownames(decomp)[decomp$mean>0.25
 
 sce.atac <- sce.atac[hvgs,]
 
-logcounts_all = rbind(logcounts(sce.rna), logcounts(sce.atac))
+logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
 
 #---------------------------MOFA------------------------------------------------
 
@@ -71,11 +71,11 @@ mofa_list <- list(
 
 # MOFA model and training
 model <- create_mofa(mofa_list)
-samples_metadata(model) <- as.data.frame(metadata) %>% rownames_to_column("sample")
+samples_metadata(model) <- as.data.frame(metadata) %>% rownames_to_column("sample") %>% mutate(isNA =  c(rep("yes", 5016), rep("no", 10032 - 5016)))
 plot_data_overview(model)
 MOFAobject <- prepare_mofa(model)
 
-run_mofa(MOFAobject, outfile = "~/R/Data/model.hdf5", use_basilisk = TRUE)
+run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
 
 trained_model <- load_model("~/R/Data/model.hdf5")
 
@@ -115,21 +115,28 @@ stab_umap = calculateUMAP(t(stab))
 
 CellType <- setNames(metadata_ct, colnames(logcounts_all))
 
-full_umap <- merge( as.data.frame(CellType), stab_umap, by =0 )
+ATAC = logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")]
 
-ggplot(full_umap) +
-  geom_point(aes(x = V1, y = V2, color = CellType)) +
-  theme_light()
+full_umap <- merge( as.data.frame(CellType), stab_umap, by =0 ) %>% mutate(isNA = ifelse(Row.names %in% colnames(ATAC), "yes", "no"))
 
-#---------------------------Comparison------------------------------------------
-plot_dimred(trained_model, method = "UMAP", color_by = "celltype", dot_size =1)
 ggplot(full_umap) +
   geom_point(aes(x = V1, y = V2, color = CellType), size = .1) +
   theme_light()
 
-#---------------------------Silhoutte-------------------------------------------
+#---------------------------Comparison------------------------------------------
+plot_dimred(trained_model, method = "UMAP", color_by = "celltype", dot_size =1)
+plot_dimred(trained_model, method = "UMAP", color_by = "isNA", dot_size =1)
 
-#StabMap
+ggplot(full_umap) +
+  geom_point(aes(x = V1, y = V2, color = CellType), size = .1) +
+  theme_light()
+ggplot(full_umap) +
+  geom_point(aes(x = V1, y = V2, color = isNA), size = .1) +
+  theme_light()
+
+#---------------------------Silhouette-------------------------------------------
+
+#StabMap celltype
 
 full_umap <- full_join(full_umap %>% group_by(CellType) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n), full_umap)
 full_umap_coords <- full_umap %>% select("V1", "V2")
@@ -139,9 +146,21 @@ sil_Stab_sum <- sil_Stab %>%
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
                                                       pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
+sil_Stab_sum
 
+#StabMap NA
 
-#MOFA
+full_umap_NA <- full_join(full_umap %>% group_by(isNA) %>% summarise(n = n()) %>% mutate(k = 1:2) %>% select(-n), full_umap)
+full_umap_NA_coords <- full_umap_NA %>% select("V1", "V2")
+
+sil_Stab_NA <- silhouette(full_umap_NA$k, dist(full_umap_NA_coords))
+sil_Stab_sum_NA <- sil_Stab_NA %>% 
+  as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
+                                                      frac_pos = sum(sil_width > 0)/n(),
+                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
+sil_Stab_sum_NA
+
+#MOFA celltype
 MOFA_cluster <- full_join(as.data.frame(trained_model@dim_red), as.data.frame(metadata) %>% rownames_to_column("sample"), by = join_by(UMAP.sample == sample)) %>%
   full_join(.,y = full_umap %>% group_by(CellType) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n), by = join_by(celltype  == CellType))
 
@@ -149,8 +168,25 @@ sil_MOFA <- silhouette(MOFA_cluster$k, dist(as.data.frame(trained_model@dim_red)
 sil_MOFA_sum <- sil_MOFA %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
+                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #?
+sil_MOFA_sum
 
+#MOFA NA 
+
+MOFA_cluster_NA <- full_join(as.data.frame(trained_model@dim_red), as.data.frame(metadata) %>% rownames_to_column("sample")%>% mutate(isNA =  c(rep("yes", 5016), rep("no", 10032 - 5016))), by = join_by(UMAP.sample == sample)) %>%
+  full_join(.,y = full_umap %>% group_by(isNA) %>% summarise(n = n()) %>% mutate(k = 1:2) %>% select(-n))
+
+sil_MOFA_NA <- silhouette(MOFA_cluster_NA$k, dist(as.data.frame(trained_model@dim_red)))
+sil_MOFA_sum_NA <- sil_MOFA_NA %>% 
+  as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
+                                                      frac_pos = sum(sil_width > 0)/n(),
+                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #?
+sil_MOFA_sum_NA
+
+#---------------------------Cluster stats---------------------------------------
+library(fpc)
+stats_stab <- cluster.stats(dist(full_umap_coords), full_umap$k)
+stats_MOFA <- cluster.stats(dist(as.data.frame(trained_model@dim_red)), MOFA_cluster$k)
 
 #---------------------------Imputation------------------------------------------
 imp = imputeEmbedding(

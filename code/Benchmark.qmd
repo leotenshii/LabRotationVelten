@@ -1,7 +1,9 @@
 ---
 title: "Benchmark"
 author: "Leoni Zimmermann"
-format: html
+html:
+  code-fold: true
+  code-summary: "Show the code"
 editor: visual
 ---
 
@@ -9,7 +11,7 @@ editor: visual
 
 ## Libraries
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 #---------------------------Seed------------------------------------------------
 set.seed(42)
 #---------------------------Libraries-------------------------------------------
@@ -21,6 +23,7 @@ library(tidyverse)
 library(cluster)
 library(patchwork)
 library(fpc)
+library(MultiAssayExperiment)
 ```
 
 ## Preparing Data
@@ -37,7 +40,7 @@ Load Data
 #mae <- scMultiome("pbmc_10x", mode = "*", dry.run = FALSE, format = "MTX")
 
 # Loaded from RDS cause I cant install the SingleCellMultiModal package
-mae <- readRDS("R/Data/data.RDS")
+mae <- readRDS("~/R/Data/data.RDS")
 metadata <- mae@colData
 metadata_ct <- metadata$celltype
 ```
@@ -113,6 +116,7 @@ CellType <- setNames(metadata_ct, colnames(logcounts_all))
 ATAC = logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")]
 
 full_umap <- merge( as.data.frame(CellType), stab_umap, by =0 ) %>% mutate(isNA = ifelse(Row.names %in% colnames(ATAC), "yes", "no"))
+rownames(full_umap) <- full_umap$Row.names
 
 # For printing
 full_umap_k <- full_join(full_umap, full_umap %>% group_by(CellType) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n))
@@ -132,7 +136,7 @@ logcounts_allNA <- logcounts_all
 
 #logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
 
-logcounts_allNA <- readRDS("R/Data/logcountsNA.RDS")
+logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
 
 # Create list for MOFa
 mofa_list <- list(
@@ -152,6 +156,8 @@ trained_model <- load_model("~/R/Data/model.hdf5")
 
 # UMAP
 trained_model <- run_umap(trained_model)
+MOFA_UMAP <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
+rownames(MOFA_UMAP) <- trained_model@dim_red$UMAP$sample
 
 # For printing
 MOFA_cluster <- full_join(as.data.frame(trained_model@dim_red), as.data.frame(metadata) %>% rownames_to_column("sample"), by = join_by(UMAP.sample == sample)) %>%
@@ -238,24 +244,57 @@ stats_MOFA
 
 ## Celltype accuracy (from StabMap paper)
 
+What exactly does the function do?
+
 ```{r}
-source("R/Scripts/adaptiveKNN.R")
+source("adaptiveKNN.R")
 
-# Randomly select indices to be set to NA
-na_indices <- sample(1:nrow(full_umap), 200)
-
-# Introduce NA values at the selected indices
-ct_na <- full_umap$CellType
-
-ct_na[na_indices] <- NA
-
-names(ct_na) <- full_umap$Row.names
+# Predict "ATAC only"cell's cell types 
+rna_train <- full_umap$CellType[1:5016]
+names(rna_train) <- full_umap$Row.names[1:5016]
+atac_query <- full_umap$CellType[5016:10032]
+names(atac_query) <- full_umap$Row.names[5016:10032]
 
 
-  knn_out = embeddingKNN(full_umap_coords,
-                         ct_na,
-                         type = "uniform_fixed",
-                         k_values = 5)
+knn_out_stab = embeddingKNN(full_umap_coords,
+                       rna_train,
+                       type = "uniform_fixed",
+                       k_values = 5)
+acc_stab = mean(isEqual(knn_out_stab[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
+acc_bal_stab = mean(unlist(lapply(split(isEqual(knn_out_stab[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+
+knn_out_MOFA = embeddingKNN(MOFA_UMAP,
+                       rna_train,
+                       type = "uniform_fixed",
+                       k_values = 5)
+acc_MOFA = mean(isEqual(knn_out_MOFA[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
+acc_bal_MOFA = mean(unlist(lapply(split(isEqual(knn_out_MOFA[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+
+acc_bal = mean(unlist(lapply(split(isEqual(knn_out_MOFA[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+
+cat(paste0("Accuracy StabMap: ", acc_stab,"/",acc_bal_stab,"(per celltype)", "\n","Accuracy MOFA: ", acc_MOFA,"/",acc_bal_MOFA,"(per celltype)"))
+
+```
+
+Interpretation result
+
+## Jaccard
+
+Unfinished!!!
+
+```{r}
+source("~/R/Scripts/comparison_functions.R")
+# StabMap
+embedding_ATAC <- full_umap_coords[5016:10032,]
+embedding_RNA <- full_umap_coords #wrong??
+ 
+
+rownames(embedding_ATAC) <- gsub("_atac", "", rownames(embedding_ATAC))
+    cells = intersect(rownames(embedding_RNA), rownames(embedding_ATAC))
+    embedding_RNA_common = embedding_RNA[cells,]
+    embedding_ATAC_common = embedding_ATAC[cells,]
+    
+    embedding_jaccard = embeddingJaccard(embedding_RNA_common, embedding_ATAC_common)
 ```
 
 # Imputation

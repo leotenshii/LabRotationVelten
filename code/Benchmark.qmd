@@ -216,7 +216,7 @@ stab_sil <- silhouette(stab_umap$k, dist(stab_umap %>% select(V1, V2)))
 stab_sil_sum <- stab_sil %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
+                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #average quality of clustering for the well-clustered data points within each cluster
 stab_sil_sum
 
 #StabMap NA
@@ -234,7 +234,7 @@ mofa_sil <- silhouette(mofa_umap$k, dist(mofa_umap %>% select(UMAP1, UMAP2)))
 mofa_sil_sum <- mofa_sil %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #?
+                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) 
 mofa_sil_sum
 
 #MOFA NA 
@@ -243,7 +243,7 @@ mofa_sil_NA <- silhouette(mofa_umap$isNA, dist(mofa_umap %>% select(UMAP1, UMAP2
 mofa_sil_sum_NA <- mofa_sil_NA %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #?
+                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) 
 mofa_sil_sum_NA
 ```
 Zelltypen: Cluster 5 (effector CD8 T cells) für beide Methoden schlecht --> -0.4243316 (MOFA). Überschneidet sich mit Kluster 3 (MAIT T cells), Kluster 8 (memory CD4 T cells) und 2 (CD56 (dim) NK cells)
@@ -258,11 +258,29 @@ Mean score für StabMap: 0.39, MOFA: 0.45
 stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k)
 mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
 ```
+May be interesting:
+corrected.rand (Corrected Rand Index): Measures the similarity between the true labels and the clustering results. It accounts for chance groupings, making it a robust metric for comparing clustering performance against the ground truth.
 
+entropy (Entropy of the Distribution of Cluster Memberships): Indicates how well the clusters are balanced. Lower entropy suggests more balanced cluster sizes, which is often desirable.
+
+ch (Calinski and Harabasz Index): Assesses cluster dispersion and separation. Higher values indicate better clustering, balancing compactness and separation.
+
+dunn (Dunn Index): Ratio of minimum inter-cluster distance to maximum intra-cluster distance. Higher values suggest well-separated and compact clusters.
+
+pearsongamma (Pearson Gamma): Measures the correlation between distances and a binary vector indicating cluster membership. Higher values indicate a strong relationship between distance and cluster membership.
+
+vi (Variation of Information Index): Quantifies the difference between the true labels and the clustering results. Lower values indicate better alignment with the ground truth.
 
 ## Celltype accuracy (from StabMap paper)
 
-What exactly does the function do?
+Given a joint embedding, we perform a simulation such that discrete class labels corresponding to cell types are artificially removed (atac_query are the "removed" ones) for a subset of the data. We then perform k-nearest neighbors classification (k=5) to obtain the predicted class label for the artificially unlabeled data. The cell type classification accuracy is thus the proportion of cells for which the classification is correct compared to the true cell type label
+
+Find the k-nearest neighbors in one data set for each point in another query data set, using exact or
+approximate algorithms
+
+uniformed_fixed => One fixed k for all
+
+The balanced eresult is first mean for celltype, then mean over all celltypes. Unbalanced one is just the mean over all cells
 
 ```{r}
 source("adaptiveKNN.R")

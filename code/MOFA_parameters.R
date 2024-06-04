@@ -94,6 +94,31 @@ param_grid <- expand.grid(
   num_factors = c(10, 15, 20, 30, 40, 50)
 )
 
+# Overview of parameters:
+# scale_groups: if groups have different ranges/variances, it is good practice to scale each group to unit variance. Default is FALSE -> only have one group anyway
+# scale_views: if views have different ranges/variances, it is good practice to scale each view to unit variance. Default is FALSE
+# num_factors: number of factors (In other tasks, such as imputation of missing values, even small sources of variation can be important and hence models should be trained with a large number of factors.)
+# likelihoods: likelihood per view (options are “gaussian”, “poisson”, “bernoulli”). By default they are learnt automatically. We advise users to use “gaussian” whenever possible! -> kept the automatic
+    
+# Not sure about those:
+# spikeslab_factors: use spike-slab sparsity prior in the factors? default is FALSE. -> all factors treated equally, if TRUE: some factors are exactly zero, simpler model with fewer active factors
+# spikeslab_weights: use spike-slab sparsity prior in the weights? default is TRUE. -> some weights will be exactly zero, which helps in identifying which features are most relevant for each factor, if FALSE: all weights considered, more complex model
+# ard_factors: use ARD prior in the factors? Default is TRUE if using multiple groups. -> automatically determining the relevance of each factor, potentially turning off irrelevant factors, if FALSE: all equal without relevance weighting
+# ard_weights: use ARD prior in the weights? Default is TRUE if using multiple views. -> automatically determining the relevance of each feature of each view, potentially turning off irrelevant features, if FALSE: all equal without relevance weighting
+
+
+
+# maxiter: number of iterations. Default is 1000. -> Kept like this
+# convergence_mode: “fast”, “medium”, “slow”. For exploration, the fast mode is good enough. -> Did fast
+# startELBO: initial iteration to compute the ELBO (the objective function used to assess convergence). -> See no reason to change
+# freqELBO: frequency of computations of the ELBO. -> See no reason to change
+# stochastic: use stochastic inference? (default is FALSE). -> TRUE would make it faster but less accurate
+
+ 
+
+
+
+
 #---------------------------Result list-----------------------------------------
 results <- list()
 

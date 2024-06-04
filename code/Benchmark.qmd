@@ -147,10 +147,14 @@ samples_metadata(model) <- as.data.frame(metadata) %>%
                               rownames_to_column("sample") %>% 
                               mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) # 1 is TRUE, 0 is FALSE
 plot_data_overview(model)
-MOFAobject <- prepare_mofa(model)
 
-# set.seed(42)
-# run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
+model_opts <- get_default_model_options(model)
+model_opts$num_factors <- 30
+MOFAobject <- prepare_mofa(model,
+                           model_options = model_opts)
+
+ set.seed(42)
+ run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
 
 trained_model <- load_model("~/R/Data/model.hdf5")
 
@@ -264,12 +268,13 @@ What exactly does the function do?
 source("adaptiveKNN.R")
 
 # Predict "ATAC only" cell's cell types 
+# Split Data
 rna_train <- stab_umap$celltype[1:5016]
 names(rna_train) <- rownames(stab_umap)[1:5016]
 atac_query <- stab_umap$celltype[5016:10032]
 names(atac_query) <- rownames(stab_umap)[5016:10032]
 
-
+# StabMap
 stab_knn_out = embeddingKNN(stab_umap_coord,
                        rna_train,
                        type = "uniform_fixed",
@@ -277,6 +282,7 @@ stab_knn_out = embeddingKNN(stab_umap_coord,
 stab_knn_acc = mean(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
 stab_knn_acc_bal = mean(unlist(lapply(split(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
 
+# MOFA
 mofa_knn_out = embeddingKNN(mofa_umap_coord,
                        rna_train,
                        type = "uniform_fixed",
@@ -284,32 +290,12 @@ mofa_knn_out = embeddingKNN(mofa_umap_coord,
 mofa_knn_acc = mean(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
 mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
 
-acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
-
-cat(paste0("Accuracy StabMap: ", stab_knn_acc,"/",stab_knn_acc_bal,"(per celltype)", "\n","Accuracy MOFA: ", mofa_knn_acc,"/",mofa_knn_acc_bal,"(per celltype)"))
+# Result
+cat(" Accuracy StabMap: ", stab_knn_acc,"/",stab_knn_acc_bal,"(per celltype)", "\n","Accuracy MOFA: ", mofa_knn_acc,"/",mofa_knn_acc_bal,"(per celltype)")
 
 ```
 
 Interpretation result
-
-## Jaccard
-
-Unfinished!!!
-
-```{r}
-source("~/R/Scripts/comparison_functions.R")
-# StabMap
-embedding_ATAC <- stab_umap_coord[5016:10032,]
-embedding_RNA <- stab_umap_coord #wrong??
- 
-
-rownames(embedding_ATAC) <- gsub("_atac", "", rownames(embedding_ATAC))
-    cells = intersect(rownames(embedding_RNA), rownames(embedding_ATAC))
-    embedding_RNA_common = embedding_RNA[cells,]
-    embedding_ATAC_common = embedding_ATAC[cells,]
-    
-    embedding_jaccard = embeddingJaccard(embedding_RNA_common, embedding_ATAC_common)
-```
 
 # Imputation
 
@@ -326,3 +312,32 @@ trained_model <- impute(trained_model)
 # trained_model@imputed_data$ATAC[[1]][1:10, 1:5]
 
 ```
+
+##RSME
+```{r}
+# StabMap
+# Dataframe with predicted and real values
+
+stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
+                  rownames_to_column("feature") %>%
+                  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+                  full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
+                  rownames_to_column("feature") %>%
+                  pivot_longer(-feature, names_to = "sample", values_to = "actual"))
+
+stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
+
+# MOFA
+mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
+                  rownames_to_column("feature") %>%
+                  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+                  full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
+                  rownames_to_column("feature") %>%
+                  pivot_longer(-feature, names_to = "sample", values_to = "actual"))
+
+mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
+
+cat(" StabMap RSME:", stab_rsme, "\n", "MOFA RSME:",mofa_rsme )
+
+```
+

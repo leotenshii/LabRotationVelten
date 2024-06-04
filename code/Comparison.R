@@ -1,3 +1,10 @@
+
+  
+  # Prep
+  
+  ## Libraries
+  
+
 #---------------------------Seed------------------------------------------------
 set.seed(42)
 #---------------------------Libraries-------------------------------------------
@@ -7,28 +14,35 @@ library(scran)
 library(StabMap)
 library(tidyverse)
 library(cluster)
+library(patchwork)
+library(fpc)
+library(MultiAssayExperiment)
+library(plotly)
+ 
 
-#library(SingleCellMultiModal)
+## Preparing Data
 
+
+
+ 
 #---------------------------Dataset---------------------------------------------
 # Peripheral Blood Mononuclear Cells provided by 10x Genomics website
 # 10x Genomics Multiome technology enables simultaneous profiling of the transcriptome 
 # (using 3’ gene expression) and epigenome (using ATAC-seq) from single cells to deepen 
 # our understanding of how genes are expressed and regulated across different cell types.
 
-#mae <- scMultiome("pbmc_10x", mode = "*", dry.run = FALSE, format = "MTX")
+# mae <- scMultiome("pbmc_10x", mode = "*", dry.run = FALSE, format = "MTX")
 
 # Loaded from RDS cause I cant install the SingleCellMultiModal package
-mae <- readRDS("R/Data/data.RDS")
+mae <- readRDS("~/R/Data/data.RDS")
 metadata <- mae@colData
-metadata_ct <- metadata$celltype
+ 
 
 
+ 
 #---------------------------Data preperation------------------------------------
 # Normalization RNA
 sce.rna <- experiments(mae)[["rna"]]
-
-# Normalisation
 sce.rna <- logNormCounts(sce.rna)
 
 # Feature selection
@@ -40,12 +54,9 @@ sce.rna <- sce.rna[hvgs,]
 
 # Normalization ATAC
 sce.atac <- experiments(mae)[["atac"]]
-
-# Normalise
 sce.atac <- logNormCounts(sce.atac)
 
 # Feature selection using highly variable peaks
-# And adding matching peaks to genes
 decomp <- modelGeneVar(sce.atac)
 hvgs <- rownames(decomp)[decomp$mean>0.25
                          & decomp$p.value <= 0.05]
@@ -53,44 +64,27 @@ hvgs <- rownames(decomp)[decomp$mean>0.25
 sce.atac <- sce.atac[hvgs,]
 
 logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
+ 
 
-#---------------------------MOFA------------------------------------------------
+## Some general dataframes etc.
 
-# Put NAs in data 
-logcounts_allNA <- logcounts_all
+ 
+# Celltypes of all samples
+all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all))) %>%
+  rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
 
-#logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
-
-logcounts_allNA <- readRDS("R/Data/logcountsNA.RDS")
-
-# Create list for MOFa
-mofa_list <- list(
-  RNA =  logcounts_allNA[1:952,],
-  ATAC = logcounts_allNA[953: 1740,]
-)
-
-# MOFA model and training
-model <- create_mofa(mofa_list)
-samples_metadata(model) <- as.data.frame(metadata) %>% rownames_to_column("sample") %>% mutate(isNA =  c(rep("yes", 5016), rep("no", 10032 - 5016)))
-plot_data_overview(model)
-MOFAobject <- prepare_mofa(model)
-
-run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
-
-trained_model <- load_model("~/R/Data/model.hdf5")
-
-# UMAP
-trained_model <- run_umap(trained_model)
-plot_dimred(trained_model, method = "UMAP", color_by = "celltype")
+# Clusters
+cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
+ 
 
 
+## StabMap
+
+ 
 #---------------------------StabMap---------------------------------------------
 
 # Seperation ATAC Multiome
-atac <- rep("ATAC", 5016)
-multiomes <- rep("Multiome", 5016)
-
-names <- c(atac, multiomes)
+names <- c(rep("ATAC", ncol(logcounts_all)/2), rep("Multiome", ncol(logcounts_all)/2))
 
 # Assay Types
 assayType = ifelse(rownames(logcounts_all) %in% rownames(sce.rna),
@@ -111,71 +105,180 @@ stab = stabMap(assay_list,
                plot = FALSE)
 
 # UMAP
-stab_umap = calculateUMAP(t(stab))
+stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
 
-CellType <- setNames(metadata_ct, colnames(logcounts_all))
 
-ATAC = logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")]
+# Add metadata to the UMAP results (celltype, if it was an NA cell, cluster)
+stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>% 
+  mutate(isNA = ifelse(Row.names %in% colnames(assay_list$ATAC), 1, 0)) %>% # 1 is TRUE, 0 is FALSE
+  full_join(cluster) %>%
+  column_to_rownames("Row.names")
 
-full_umap <- merge( as.data.frame(CellType), stab_umap, by =0 ) %>% mutate(isNA = ifelse(Row.names %in% colnames(ATAC), "yes", "no"))
+ 
 
-ggplot(full_umap) +
-  geom_point(aes(x = V1, y = V2, color = CellType), size = .1) +
-  theme_light()
+## MOFA model
 
-#---------------------------Comparison------------------------------------------
-plot_dimred(trained_model, method = "UMAP", color_by = "celltype", dot_size =1)
-plot_dimred(trained_model, method = "UMAP", color_by = "isNA", dot_size =1)
+ 
+#---------------------------MOFA------------------------------------------------
 
-ggplot(full_umap) +
-  geom_point(aes(x = V1, y = V2, color = CellType), size = .1) +
-  theme_light()
-ggplot(full_umap) +
+# Put NAs in data, takes a long time
+# logcounts_allNA <- logcounts_all
+# logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
+
+logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
+
+# Create list for MOFA
+mofa_list <- list(
+  RNA =  logcounts_allNA[1:952,],
+  ATAC = logcounts_allNA[953: 1740,]
+)
+
+# MOFA model and training
+model <- create_mofa(mofa_list)
+samples_metadata(model) <- as.data.frame(metadata) %>% 
+  rownames_to_column("sample") %>% 
+  mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) # 1 is TRUE, 0 is FALSE
+plot_data_overview(model)
+MOFAobject <- prepare_mofa(model)
+
+# set.seed(42)
+# run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
+
+trained_model <- load_model("~/R/Data/model.hdf5")
+
+# UMAP
+trained_model <- run_umap(trained_model)
+mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
+
+# Add metadata to the UMAP results (celltype, if it was an NA cell, cluster)
+mofa_umap <- merge(trained_model@dim_red$UMAP, all_celltypes, by = 0)  %>%
+  full_join(cluster) %>% 
+  mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) %>%  # 1 is TRUE, 0 is FALSE
+  column_to_rownames("Row.names") %>%
+  select(-sample)
+ 
+
+# Dimension reduction
+
+## Comparison UMAPS
+
+ 
+# MOFA
+UM1 <- plot_dimred(trained_model, method = "UMAP", color_by = "celltype", dot_size =1) + ggtitle("MOFA celltype")
+UM2 <- plot_dimred(trained_model, method = "UMAP", color_by = "isNA", dot_size =1)+ ggtitle("MOFA NA")
+UM3 <- plot_dimred(trained_model, method = "UMAP", color_by = "broad_celltype", dot_size =1)+ ggtitle("MOFA broad celltype")
+
+# StabMap
+US1 <- ggplot(stab_umap) +
+  geom_point(aes(x = V1, y = V2, color = celltype), size = .1) +
+  theme_light() +
+  ggtitle("StabMap celltype")
+US2 <- ggplot(stab_umap) +
   geom_point(aes(x = V1, y = V2, color = isNA), size = .1) +
-  theme_light()
+  theme_light() +
+  ggtitle("StabMap NA")
+US3 <- ggplot(stab_umap) +
+  geom_point(aes(x = V1, y = V2, color = broad_celltype), size = .1) +
+  theme_light() +
+  ggtitle("StabMap broad celltype")
 
+# Plot
+combined_plot <- (UM1 + UM2 + UM3) / (US1 + US2 + US3) + plot_annotation(title = 'Comparison UMAP')
+print(combined_plot)
+
+# Interactive plots
+# ggplotly(UM1)
+ 
+
+## Silhouette
+
+ 
 #---------------------------Silhouette-------------------------------------------
 
 #StabMap celltype
 
-sil_Stab <- silhouette(full_umap$k, dist(full_umap_coords))
-sil_Stab_sum <- sil_Stab %>% 
+stab_sil <- silhouette(stab_umap$k, dist(stab_umap %>% select(V1, V2)))
+stab_sil_sum <- stab_sil %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
                                                       pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
-sil_Stab_sum
+stab_sil_sum
 
 #StabMap NA
 
-sil_Stab_NA <- silhouette(full_umap_NA$k, dist(full_umap_NA_coords))
-sil_Stab_sum_NA <- sil_Stab_NA %>% 
+stab_sil_NA <- silhouette(stab_umap$isNA, dist(stab_umap %>% select(V1, V2)))
+stab_sil_sum_NA <- stab_sil_NA %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
                                                       pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
-sil_Stab_sum_NA
+stab_sil_sum_NA
 
 #MOFA celltype
 
-sil_MOFA <- silhouette(MOFA_cluster$k, dist(as.data.frame(trained_model@dim_red)))
-sil_MOFA_sum <- sil_MOFA %>% 
+mofa_sil <- silhouette(mofa_umap$k, dist(mofa_umap %>% select(UMAP1, UMAP2)))
+mofa_sil_sum <- mofa_sil %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
                                                       pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #?
-sil_MOFA_sum
+mofa_sil_sum
 
 #MOFA NA 
 
-sil_MOFA_NA <- silhouette(MOFA_cluster_NA$k, dist(as.data.frame(trained_model@dim_red)))
-sil_MOFA_sum_NA <- sil_MOFA_NA %>% 
+mofa_sil_NA <- silhouette(mofa_umap$isNA, dist(mofa_umap %>% select(UMAP1, UMAP2)))
+mofa_sil_sum_NA <- mofa_sil_NA %>% 
   as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
                                                       frac_pos = sum(sil_width > 0)/n(),
                                                       pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #?
-sil_MOFA_sum_NA
+mofa_sil_sum_NA
+ 
 
-#---------------------------Cluster stats---------------------------------------
-stats_stab <- cluster.stats(dist(full_umap_coords), full_umap$k)
-stats_MOFA <- cluster.stats(dist(as.data.frame(trained_model@dim_red)), MOFA_cluster$k)
+## More cluster stats
 
+ 
+stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k)
+mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
+ 
+
+
+## Celltype accuracy (from StabMap paper)
+
+
+   
+source("adaptiveKNN.R")
+
+# Predict "ATAC only" cell's cell types 
+# Split Data
+rna_train <- stab_umap$celltype[1:5016]
+names(rna_train) <- rownames(stab_umap)[1:5016]
+atac_query <- stab_umap$celltype[5016:10032]
+names(atac_query) <- rownames(stab_umap)[5016:10032]
+
+# StabMap
+stab_knn_out = embeddingKNN(stab_umap_coord,
+                            rna_train,
+                            type = "uniform_fixed",
+                            k_values = 5)
+stab_knn_acc = mean(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
+stab_knn_acc_bal = mean(unlist(lapply(split(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+
+# MOFA
+mofa_knn_out = embeddingKNN(mofa_umap_coord,
+                            rna_train,
+                            type = "uniform_fixed",
+                            k_values = 5)
+mofa_knn_acc = mean(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
+mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+
+# Result
+cat(" Accuracy StabMap: ", stab_knn_acc,"/",stab_knn_acc_bal,"(per celltype)", "\n","Accuracy MOFA: ", mofa_knn_acc,"/",mofa_knn_acc_bal,"(per celltype)")
+
+ 
+
+
+
+# Imputation
+
+ 
 #---------------------------Imputation------------------------------------------
 imp = imputeEmbedding(
   assay_list,
@@ -186,4 +289,34 @@ imp = imputeEmbedding(
 trained_model <- impute(trained_model)
 # imp$Multiome[953:963, 1:5]
 # trained_model@imputed_data$ATAC[[1]][1:10, 1:5]
+
+ 
+
+##RSME
+ 
+# StabMap
+# Dataframe with predicted and real values
+
+stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
+  rownames_to_column("feature") %>%
+  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+  full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
+              rownames_to_column("feature") %>%
+              pivot_longer(-feature, names_to = "sample", values_to = "actual"))
+
+stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
+
+# MOFA
+mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
+  rownames_to_column("feature") %>%
+  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+  full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
+              rownames_to_column("feature") %>%
+              pivot_longer(-feature, names_to = "sample", values_to = "actual"))
+
+mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
+
+cat(" StabMap RSME:", stab_rsme, "\n", "MOFA RSME:",mofa_rsme )
+
+ 
 

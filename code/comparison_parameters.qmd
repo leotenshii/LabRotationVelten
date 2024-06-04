@@ -1,0 +1,70 @@
+---
+title: "Comparing Prameters"
+format: html
+editor: visual
+---
+
+# MOFA
+
+```{r}
+suppressMessages(c(library(tidyverse),
+                   library(plotly)))
+```
+
+```{r}
+mofa_comparison <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+```
+
+## Scale Data
+
+mean var RNA:
+
+```         
+1.209184
+```
+
+mean var ATAC:
+
+```         
+0.5261105
+```
+
+Differnces between same
+
+```{r}
+diffs <- data.frame(
+  num_factor_diff = mofa_comparison$num_factor[mofa_comparison$scale_views == TRUE] - mofa_comparison$num_factor[mofa_comparison$scale_views == FALSE],
+  mean_sil_score_diff = mofa_comparison$mean_sil_score[mofa_comparison$scale_views == TRUE] - mofa_comparison$mean_sil_score[mofa_comparison$scale_views == FALSE],
+  min_sil_score_diff = mofa_comparison$min_sil_score[mofa_comparison$scale_views == TRUE] - mofa_comparison$min_sil_score[mofa_comparison$scale_views == FALSE],
+  max_sil_score_diff = mofa_comparison$max_sil_score[mofa_comparison$scale_views == TRUE] - mofa_comparison$max_sil_score[mofa_comparison$scale_views == FALSE],
+  mofa_knn_acc_diff = mofa_comparison$mofa_knn_acc[mofa_comparison$scale_views == TRUE] - mofa_comparison$mofa_knn_acc[mofa_comparison$scale_views == FALSE],
+  mofa_knn_acc_bal_diff = mofa_comparison$mofa_knn_acc_bal[mofa_comparison$scale_views == TRUE] - mofa_comparison$mofa_knn_acc_bal[mofa_comparison$scale_views == FALSE],
+  mofa_rsme_diff = mofa_comparison$mofa_rsme[mofa_comparison$scale_views == TRUE] - mofa_comparison$mofa_rsme[mofa_comparison$scale_views == FALSE]
+)
+
+# mofa_comparison %>% 
+#   group_by(scale_views, num_factor) %>%
+#   summarise()
+
+# Print the differences
+print(diffs)
+```
+
+Difference not really big --\> Take the FALSE ones (is the default)
+
+```{r}
+mofa_comparison_plot <- mofa_comparison %>% 
+                          filter(scale_views == FALSE) %>%
+                          select(-c(scale_views, min_sil_score_name)) %>%
+                          pivot_longer(-num_factor, names_to = "metric") %>%
+                          ggplot(aes(fill = as.factor(num_factor),
+                                     x = metric, 
+                                     y = value))+
+                          geom_bar(position="dodge", stat="identity")
+
+# ggplot(aes(fill = metric, x = num_factor, y = value))+
+#                         geom_bar(position="dodge", stat="identity")
+ggplotly(mofa_comparison_plot)
+```
+
+num_factor 20 or 30 look best

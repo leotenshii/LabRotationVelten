@@ -13,6 +13,7 @@ suppressMessages(c(library(tidyverse),
 
 ```{r}
 mofa_comparison <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+
 ```
 
 ## Scale Data
@@ -63,3 +64,53 @@ ggplotly(mofa_comparison_plot)
 ```
 
 num_factor 20 or 30 look best
+
+# StabMap
+
+```{r}
+
+stab_comparison <- read.table("~/R/Data/comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+
+```
+
+```{r}
+rbind(
+stab_comparison[which.max(stab_comparison$mean_sil_score),],
+stab_comparison[which.max(stab_comparison$min_sil_score),],
+stab_comparison[which.max(stab_comparison$max_sil_score),],
+stab_comparison[which.max(stab_comparison$stab_knn_acc_bal),],
+stab_comparison[which.min(stab_comparison$stab_rsme),])
+```
+
+```{r}
+stab_comparison %>%
+  arrange(desc(mean_sil_score))%>%
+  top_n( 10, mean_sil_score)
+# Seems scale.center scale.scale should be TRUE, medium ncomponents with max maxFeatures
+
+stab_comparison %>%
+  arrange(desc(min_sil_score))%>%
+  top_n( 10, min_sil_score)
+
+stab_comparison %>%
+  arrange(desc(max_sil_score))%>%
+  top_n( 10, max_sil_score)
+# scale center FALSE, scale.scale TRUE
+
+stab_comparison %>%
+  arrange(desc(stab_knn_acc_bal))%>%
+  top_n( 10, stab_knn_acc_bal)
+
+stab_comparison %>%
+  arrange(stab_rsme)%>%
+  top_n( -10, stab_rsme)
+# Seems scale.center scale.scale should be FALSE, higher numbers of components and features
+```
+
+Taking 50,50,1100,TRUE,TRUE for clustering (RSME could be better so maybe
+
+```         
+70                70        1100        FALSE       FALSE
+```
+
+for RSME?)

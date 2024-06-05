@@ -95,12 +95,16 @@ assay_list = list(
 
 #---------------------------Parameters------------------------------------------
 param_grid <- expand.grid(
-  ncomponentsReference = c( 30, 50, 70),
+  ncomponentsReference = c( 30, 50, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
   ncomponentsSubset = c( 30,  50, 70),
-  maxFeatures = c(900, 1000, 1100),
-  scale.center = c(TRUE, FALSE),
+  maxFeatures = c(900, 1000, 1100), # Too many maybe overfitting
+  scale.center = c(TRUE, FALSE), # False when mean or variance carry some important information?
   scale.scale = c(TRUE, FALSE)
 )
+
+# project_all: might help in refining the alignment? Try it
+# restrictFeatures should be false for single hop (-> documentation)
+
 
 #---------------------------Result list-----------------------------------------
 results <- list()

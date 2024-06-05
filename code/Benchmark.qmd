@@ -85,7 +85,6 @@ all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_al
 cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
 ```
 
-
 ## StabMap
 
 ```{r}
@@ -110,7 +109,8 @@ plot(mosaicDataTopology(assay_list))
 
 stab = stabMap(assay_list,
                reference_list = c("Multiome"),
-               plot = FALSE)
+               plot = FALSE,
+               maxFeatures = 1100)
 
 # UMAP
 stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
@@ -153,8 +153,8 @@ model_opts$num_factors <- 30
 MOFAobject <- prepare_mofa(model,
                            model_options = model_opts)
 
- set.seed(42)
- run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
+ # set.seed(42)
+ # run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
 
 trained_model <- load_model("~/R/Data/model.hdf5")
 
@@ -201,9 +201,28 @@ print(combined_plot)
 # Interactive plots
 # ggplotly(UM1)
 ```
+
 Nach Zelltyp: Mittelmäßig aufgetrennt
+
 Nach groben Zelltyp: Gut aufgetrennt
+
 Nach NA: Gut verteilt/nicht aufgetrennt (so sollte es sein)
+
+Myeloid cells:
+
+Classical Monocytes --\> intermediate MC --\> non-classical MC
+
+Monocytes and dendritic cells (DC) have common ancestor
+
+Lymphoid cells:
+
+naive and memory B cells together (good)
+
+plasmacytoid DC have common ancestor with myeloid dc, their progenitor can also make plasmacytoid dc
+
+```         
+"CD56 (bright) NK cells"  "CD56 (dim) NK cells"     "MAIT T cells"  "effector CD8 T cells"  "memory CD4 T cells"  "naive CD4 T cells" naive CD8 T cells
+```
 
 ## Silhouette
 
@@ -246,7 +265,8 @@ mofa_sil_sum_NA <- mofa_sil_NA %>%
                                                       pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) 
 mofa_sil_sum_NA
 ```
-Zelltypen: Cluster 5 (effector CD8 T cells) für beide Methoden schlecht --> -0.4243316 (MOFA). Überschneidet sich mit Kluster 3 (MAIT T cells), Kluster 8 (memory CD4 T cells) und 2 (CD56 (dim) NK cells)
+
+Zelltypen: Cluster 5 (effector CD8 T cells) für beide Methoden schlecht --\> -0.4243316 (MOFA). Überschneidet sich mit Kluster 3 (MAIT T cells), Kluster 8 (memory CD4 T cells) und 2 (CD56 (dim) NK cells)
 
 Plasmocytoid DC cells für beide Methoden am besten
 
@@ -258,8 +278,8 @@ Mean score für StabMap: 0.39, MOFA: 0.45
 stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k)
 mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
 ```
-May be interesting:
-corrected.rand (Corrected Rand Index): Measures the similarity between the true labels and the clustering results. It accounts for chance groupings, making it a robust metric for comparing clustering performance against the ground truth.
+
+May be interesting: corrected.rand (Corrected Rand Index): Measures the similarity between the true labels and the clustering results. It accounts for chance groupings, making it a robust metric for comparing clustering performance against the ground truth.
 
 entropy (Entropy of the Distribution of Cluster Memberships): Indicates how well the clusters are balanced. Lower entropy suggests more balanced cluster sizes, which is often desirable.
 
@@ -275,10 +295,9 @@ vi (Variation of Information Index): Quantifies the difference between the true 
 
 Given a joint embedding, we perform a simulation such that discrete class labels corresponding to cell types are artificially removed (atac_query are the "removed" ones) for a subset of the data. We then perform k-nearest neighbors classification (k=5) to obtain the predicted class label for the artificially unlabeled data. The cell type classification accuracy is thus the proportion of cells for which the classification is correct compared to the true cell type label
 
-Find the k-nearest neighbors in one data set for each point in another query data set, using exact or
-approximate algorithms
+Find the k-nearest neighbors in one data set for each point in another query data set, using exact or approximate algorithms
 
-uniformed_fixed => One fixed k for all
+uniformed_fixed =\> One fixed k for all
 
 The balanced eresult is first mean for celltype, then mean over all celltypes. Unbalanced one is just the mean over all cells
 
@@ -315,6 +334,19 @@ cat(" Accuracy StabMap: ", stab_knn_acc,"/",stab_knn_acc_bal,"(per celltype)", "
 
 Interpretation result
 
+## Ideas
+
+from WNN paper: get predicted expression of a gene (They used CD25 since it is hard to distinguish T cells in the dim reduction) from averaging the neighbors expression. THen calculate Correlation (Pearson and SPearman) to get quality
+
+```{r}
+# CD25
+# plot_dimred(trained_model, method = "UMAP", color_by = "IL2RA", dot_size =1)+ ggtitle("MOFA CD25")
+
+# CD57
+# plot_dimred(trained_model, method = "UMAP", color_by = "", dot_size =1)+ ggtitle("MOFA CD57")
+
+```
+
 # Imputation
 
 ```{r}
@@ -332,6 +364,7 @@ trained_model <- impute(trained_model)
 ```
 
 ##RSME
+
 ```{r}
 # StabMap
 # Dataframe with predicted and real values
@@ -358,4 +391,3 @@ mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
 cat(" StabMap RSME:", stab_rsme, "\n", "MOFA RSME:",mofa_rsme )
 
 ```
-

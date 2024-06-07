@@ -81,24 +81,35 @@ samples_metadata(model) <- as.data.frame(metadata) %>%
   rownames_to_column("sample") %>% 
   mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) # 1 is TRUE (so it is NA), 0 is FALSE
 
-MOFAobject <- prepare_mofa(model)
+# MOFAobject <- prepare_mofa(model)
 
 # Get differnt model settings
-data_opts <- get_default_data_options(MOFAobject)
-model_opts <- get_default_model_options(MOFAobject)
+data_opts <- get_default_data_options(model)
+model_opts <- get_default_model_options(model)
 # train_opts <- get_default_training_options(MOFAobject)
 
 #---------------------------Parameters------------------------------------------
+# V1
+# param_grid <- expand.grid(
+#   scale_views = c(TRUE,FALSE),
+#   num_factors = c(10, 15, 20, 30, 40, 50)
+# )
+
+# V2
 param_grid <- expand.grid(
-  scale_views = c(TRUE,FALSE),
-  num_factors = c(10, 15, 20, 30, 40, 50)
+  scale_views = c(FALSE),
+  num_factors = c(20, 30),
+  # spikeslab_factors = c(TRUE, FALSE),
+  spikeslab_weights = c(TRUE,FALSE),
+  ard_factors = c(TRUE,FALSE),
+  ard_weights = c(TRUE,FALSE)
 )
 
 # Overview of parameters:
 # scale_groups: if groups have different ranges/variances, it is good practice to scale each group to unit variance. Default is FALSE -> only have one group anyway
 # scale_views: if views have different ranges/variances, it is good practice to scale each view to unit variance. Default is FALSE
 # num_factors: number of factors (In other tasks, such as imputation of missing values, even small sources of variation can be important and hence models should be trained with a large number of factors.)
-# likelihoods: likelihood per view (options are “gaussian”, “poisson”, “bernoulli”). By default they are learnt automatically. We advise users to use “gaussian” whenever possible! -> kept the automatic
+# likelihoods: likelihood per view (options are ?gaussian?, ?poisson?, ?bernoulli?). By default they are learnt automatically. We advise users to use ?gaussian? whenever possible! -> kept the automatic
     
 # Not sure about those:
 # spikeslab_factors: use spike-slab sparsity prior in the factors? default is FALSE. -> all factors treated equally, if TRUE: some factors are exactly zero, simpler model with fewer active factors
@@ -109,7 +120,7 @@ param_grid <- expand.grid(
 
 
 # maxiter: number of iterations. Default is 1000. -> Kept like this
-# convergence_mode: “fast”, “medium”, “slow”. For exploration, the fast mode is good enough. -> Did fast
+# convergence_mode: ?fast?, ?medium?, ?slow?. For exploration, the fast mode is good enough. -> Did fast
 # startELBO: initial iteration to compute the ELBO (the objective function used to assess convergence). -> See no reason to change
 # freqELBO: frequency of computations of the ELBO. -> See no reason to change
 # stochastic: use stochastic inference? (default is FALSE). -> TRUE would make it faster but less accurate
@@ -127,14 +138,33 @@ for (i in 1:nrow(param_grid)) {
   params <- param_grid[i, ]
   
   # Print current parameters 
+  # V1
+  # cat("Running MOFA with scale_views =", params$scale_views,
+  #     ", num_factors =", params$num_factors, "\n")
+  
+  # V2
   cat("Running MOFA with scale_views =", params$scale_views,
-      ", num_factors =", params$num_factors, "\n")
+      ", num_factors =", params$num_factors,
+      # ", spikeslab_factors =", params$spikeslab_factors,
+      ", spikeslab_weights =", params$spikeslab_weights,
+      ", ard_factors =", params$ard_factors,
+      ", ard_weights =", params$ard_weights)
   
 
   # Run MOFA with current parameters
+  # V1
+  # data_opts$scale_views <- params$scale_views
+  # model_opts$num_factors <- params$num_factors
+  
+  #V2
   data_opts$scale_views <- params$scale_views
   model_opts$num_factors <- params$num_factors
-  
+  # model_opts$spikeslab_factors <- params$spikeslab_factors
+  model_opts$spikeslab_weights <- params$spikeslab_weights
+  model_opts$ard_factors <- params$ard_factors
+  model_opts$ard_factors <- params$ard_weights
+     
+    
   MOFAobject <- prepare_mofa(model, 
                              data_options = data_opts,
                              model_options = model_opts)
@@ -187,12 +217,25 @@ for (i in 1:nrow(param_grid)) {
   mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
   
   # Store results
+  # V1
+  # param_str <- paste(
+  #   "scale_views", params$scale_views,
+  #   "num_factor", params$num_factor,
+  #   sep = "_"
+  # )
+  
+  # V2
   param_str <- paste(
     "scale_views", params$scale_views,
     "num_factor", params$num_factor,
+    # "spikeslab_factors", params$spikeslab_factors,
+    "spikeslab_weights", params$spikeslab_weights,
+    "ard_factors", params$ard_factors,
+    "ard_weights", params$ard_weights,
     sep = "_"
   )
   
+
   results[[param_str]] <- list(
     mofa_umap = mofa_umap,
     mofa_sil_sum = mofa_sil_sum,
@@ -207,9 +250,27 @@ for (i in 1:nrow(param_grid)) {
 
 #---------------------------Comparison results----------------------------------
 # Create data frame
+# V1
+# comparison <- data.frame(
+#   scale_views = logical(),
+#   num_factor = integer(),
+#   mean_sil_score = numeric(),
+#   min_sil_score = numeric(),
+#   min_sil_score_name = character(),
+#   max_sil_score = numeric(),
+#   mofa_knn_acc = numeric(),
+#   mofa_knn_acc_bal = numeric(),
+#   mofa_rsme = numeric()
+# )
+
+# V2
 comparison <- data.frame(
   scale_views = logical(),
   num_factor = integer(),
+  # spikeslab_factors = logical(),
+  spikeslab_weights = logical(),
+  ard_factors = logical(),
+  ard_weights = logical(),
   mean_sil_score = numeric(),
   min_sil_score = numeric(),
   min_sil_score_name = character(),
@@ -231,9 +292,27 @@ for (param_name in names(results)) {
   mofa_rsme <- res$mofa_rsme
   
   param_values <- unlist(strsplit(param_name, "_"))
+  # V1
+  # comparison <- rbind(comparison, data.frame(
+  #   scale_views = as.logical(param_values[3]),
+  #   num_factor = as.numeric(param_values[6]),
+  #   mean_sil_score = mean_sil_score,
+  #   min_sil_score = min_sil_score,
+  #   min_sil_score_name = min_sil_score_name,
+  #   max_sil_score = max_sil_score,
+  #   mofa_knn_acc = mofa_knn_acc,
+  #   mofa_knn_acc_bal = mofa_knn_acc_bal,
+  #   mofa_rsme = mofa_rsme
+  # ))
+  
+  # V2
   comparison <- rbind(comparison, data.frame(
     scale_views = as.logical(param_values[3]),
     num_factor = as.numeric(param_values[6]),
+    # spikeslab_factors = as.logical(param_values[9]),
+    spikeslab_weights = as.logical(param_values[9]),
+    ard_factors = as.logical(param_values[12]),
+    ard_weights = as.logical(param_values[15]),
     mean_sil_score = mean_sil_score,
     min_sil_score = min_sil_score,
     min_sil_score_name = min_sil_score_name,
@@ -242,11 +321,16 @@ for (param_name in names(results)) {
     mofa_knn_acc_bal = mofa_knn_acc_bal,
     mofa_rsme = mofa_rsme
   ))
+
 }
 
 print(comparison)
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
+# V1
+# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
+
+# V2
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_model_comparison.txt")
 
 
 

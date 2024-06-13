@@ -99,9 +99,10 @@ assayType = ifelse(rownames(logcounts_all) %in% rownames(sce.rna),
 
 # List for StabMap
 assay_list = list(
-  ATAC = logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")], # 788x5016 -> only ATAC in first half of cells
+  ATAC = logcounts_all[assayType %in% c("rna"), names %in% c("ATAC")], # 952x5016 -> only RNA in first half of cells
   Multiome = logcounts_all[assayType %in% c("rna", "atac"), names %in% c("Multiome")] #1740x5016 -> ATAC and RNA, second half of cells
 )
+
 
 # StabMap
 mosaicDataUpSet(assay_list)
@@ -153,8 +154,8 @@ model_opts$num_factors <- 30
 MOFAobject <- prepare_mofa(model,
                            model_options = model_opts)
 
- set.seed(42)
- run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
+ # set.seed(42)
+ # run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
 
 trained_model <- load_model("~/R/Data/model.hdf5")
 
@@ -382,7 +383,6 @@ stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
                   pivot_longer(-feature, names_to = "sample", values_to = "actual"))
 
 stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
-
 # MOFA
 mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
                   rownames_to_column("feature") %>%
@@ -397,22 +397,4 @@ cat(" StabMap RSME:", stab_rsme, "\n", "MOFA RSME:",mofa_rsme )
 
 ```
 
-Get labels of imputed values (k nearest neighbors), then F1
 
-```{r}
-# library(caret)
-# 
-# mofa_predcited <- mofa_imp_comp$predicted
-# mofa_actual <- mofa_imp_comp$actual
-# 
-# confusionMatrix(predcited, actual,
-#                 mode = "everything",
-#                 positive="1")
-# 
-# confusionMatrix(predcited, actual,
-#                 mode = "everything",
-#                 positive="1")
-
-```
-
-\

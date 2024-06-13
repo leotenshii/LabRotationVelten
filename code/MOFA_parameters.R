@@ -101,7 +101,7 @@ param_grid <- expand.grid(
   num_factors = c(20, 30),
   # spikeslab_factors = c(TRUE, FALSE),
   spikeslab_weights = c(TRUE,FALSE),
-  ard_factors = c(TRUE,FALSE),
+  ard_factors = c(TRUE,FALSE), # gruppen ebene
   ard_weights = c(TRUE,FALSE)
 )
 

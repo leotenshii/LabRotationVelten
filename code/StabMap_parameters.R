@@ -87,7 +87,7 @@ assayType = ifelse(rownames(logcounts_all) %in% rownames(sce.rna),
 
 # List for StabMap
 assay_list = list(
-  ATAC = logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")],
+  ATAC = logcounts_all[assayType %in% c("rna"), names %in% c("ATAC")],
   Multiome = logcounts_all[assayType %in% c("rna", "atac"), names %in% c("Multiome")]
 )
 
@@ -166,11 +166,9 @@ for (i in 1:nrow(param_grid)) {
   
   imp = imputeEmbedding(
     assay_list,
-    stab,
-    reference = colnames(assay_list[["Multiome"]]),
-    query = colnames(assay_list[["ATAC"]]))
+    stab)
   
-  stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
+  stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,1:(ncol(logcounts_all)/2)]) %>%
     rownames_to_column("feature") %>%
     pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
     full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%

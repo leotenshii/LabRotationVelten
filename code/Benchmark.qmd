@@ -285,17 +285,6 @@ stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_uma
 mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
 ```
 
-May be interesting: corrected.rand (Corrected Rand Index): Measures the similarity between the true labels and the clustering results. It accounts for chance groupings, making it a robust metric for comparing clustering performance against the ground truth.
-
-entropy (Entropy of the Distribution of Cluster Memberships): Indicates how well the clusters are balanced. Lower entropy suggests more balanced cluster sizes, which is often desirable.
-
-ch (Calinski and Harabasz Index): Assesses cluster dispersion and separation. Higher values indicate better clustering, balancing compactness and separation.
-
-dunn (Dunn Index): Ratio of minimum inter-cluster distance to maximum intra-cluster distance. Higher values suggest well-separated and compact clusters.
-
-pearsongamma (Pearson Gamma): Measures the correlation between distances and a binary vector indicating cluster membership. Higher values indicate a strong relationship between distance and cluster membership.
-
-vi (Variation of Information Index): Quantifies the difference between the true labels and the clustering results. Lower values indicate better alignment with the ground truth.
 
 ## Celltype accuracy (from StabMap paper)
 
@@ -397,4 +386,26 @@ cat(" StabMap RSME:", stab_rsme, "\n", "MOFA RSME:",mofa_rsme )
 
 ```
 
+## Comparison against baseline
+
+```{r}
+stab_baseline_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
+                        rownames_to_column("feature") %>%
+                        pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+                        full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))) %>%
+                            rownames_to_column("feature")) %>%
+                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")])))`)
+
+stab_mae <- mean(abs(stab_baseline_comp$predicted - stab_baseline_comp$baseline))
+
+
+mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
+                  rownames_to_column("feature") %>%
+                  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+                        full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))) %>%
+                            rownames_to_column("feature")) %>%
+                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")])))`)
+
+mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
+```
 

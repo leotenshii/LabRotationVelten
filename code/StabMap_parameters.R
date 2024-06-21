@@ -72,10 +72,6 @@ all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_al
 cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
 
 
-
-## StabMap
-
-
 #---------------------------StabMap---------------------------------------------
 
 # Seperation ATAC Multiome
@@ -95,14 +91,15 @@ assay_list = list(
 
 #---------------------------Parameters------------------------------------------
 param_grid <- expand.grid(
-  ncomponentsReference = c( 30, 50, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
-  ncomponentsSubset = c( 30,  50, 70),
-  maxFeatures = c(900, 1000, 1100), # Too many maybe overfitting
+  ncomponentsReference = c( 30, 40, 50, 60, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
+  ncomponentsSubset = c( 30, 40, 50, 60, 70),
+  maxFeatures = c(1000, 1500, 1740, 2700), # Too many maybe overfitting
   scale.center = c(TRUE, FALSE), # False when mean or variance carry some important information?
-  scale.scale = c(TRUE, FALSE)
+  scale.scale = c(TRUE, FALSE),
+  project_all = c(TRUE, FALSE) # might help in refining the alignment
 )
 
-# project_all: might help in refining the alignment? Try it
+
 # restrictFeatures should be false for single hop (-> documentation)
 
 
@@ -111,17 +108,19 @@ results <- list()
 
 #---------------------------Loop------------------------------------------------
 for (i in 1:nrow(param_grid)) {
-  params <- param_grid[i, ]
+  params <- param_grid[1, ]
   
   # Print current parameters 
   cat("Running stabMap with ncomponentsReference =", params$ncomponentsReference,
       ", ncomponentsSubset =", params$ncomponentsSubset,
       ", maxFeatures =", params$maxFeatures,
       ", scale.center =", params$scale.center,
-      ", scale.scale =", params$scale.scale, "\n")
+      ", scale.scale =", params$scale.scale, 
+      ", project_all = ", params$project_all )
   
+
   # Run StabMap with current parameters
-  stab <- stabMap(
+time_integration <- system.time(  stab <- stabMap(
     assay_list,
     reference_list = c("Multiome"),
     ncomponentsReference = params$ncomponentsReference,
@@ -129,9 +128,11 @@ for (i in 1:nrow(param_grid)) {
     maxFeatures = params$maxFeatures,
     scale.center = params$scale.center,
     scale.scale = params$scale.scale,
+    projectAll = params$project_all,
     plot = FALSE
-  )
+  ))
   
+
   # UMAP
   stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
   stab_umap <- merge(as.data.frame(metadata), stab_umap_coord, by = 0) %>%
@@ -147,7 +148,8 @@ for (i in 1:nrow(param_grid)) {
     summarise(score = mean(sil_width), frac_pos = sum(sil_width > 0) / n(), pos_score = sum((sil_width > 0) * sil_width) / sum(sil_width > 0))
   
   # Calculate clustering stats
-  stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k)
+  stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k, silhouette = FALSE)
+  dunn <- stab_cluster_stats$dunn
   
   # Cell Type Accuracy
   rna_train <- stab_umap$celltype[1:5016]
@@ -164,9 +166,11 @@ for (i in 1:nrow(param_grid)) {
   
   # RSME
   
-  imp = imputeEmbedding(
+  time_imputation <- system.time(imp <- imputeEmbedding(
     assay_list,
-    stab)
+    stab,
+    reference = colnames(assay_list[["Multiome"]]),
+    query = colnames(assay_list[["ATAC"]])))
   
   stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,1:(ncol(logcounts_all)/2)]) %>%
     rownames_to_column("feature") %>%
@@ -177,6 +181,16 @@ for (i in 1:nrow(param_grid)) {
   
   stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
   
+  # Comparison Baseline
+  stab_baseline_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
+    rownames_to_column("feature") %>%
+    pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+    full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))) %>%
+                rownames_to_column("feature")) %>%
+    rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))`)
+  
+  stab_mae <- mean(abs(stab_baseline_comp$predicted - stab_baseline_comp$baseline))
+  
   # Store results
   param_str <- paste(
     "ncomponentsReference", params$ncomponentsReference,
@@ -184,16 +198,20 @@ for (i in 1:nrow(param_grid)) {
     "maxFeatures", params$maxFeatures,
     "scale.center", params$scale.center,
     "scale.scale", params$scale.scale,
+    "project_all", params$project_all,
     sep = "_"
   )
   
   results[[param_str]] <- list(
-    stab_umap = stab_umap,
+    #stab_umap = stab_umap,
     stab_sil_sum = stab_sil_sum,
-    stab_cluster_stats = stab_cluster_stats,
+    dunn = dunn,
     stab_knn_acc = stab_knn_acc,
     stab_knn_acc_bal = stab_knn_acc_bal,
-    stab_rsme = stab_rsme
+    stab_rsme = stab_rsme,
+    stab_mae = stab_mae,
+    time_integration = time_integration[3],
+    time_imputation = time_imputation[3]
   )
   
   
@@ -209,11 +227,14 @@ comparison <- data.frame(
   scale.scale = logical(),
   mean_sil_score = numeric(),
   min_sil_score = numeric(),
-  min_sil_score_name = character(),
   max_sil_score = numeric(),
+  dunn = numeric(),
   stab_knn_acc = numeric(),
   stab_knn_acc_bal = numeric(),
-  stab_rsme = numeric()
+  stab_rsme = numeric(),
+  stab_mae = numeric(),
+  time_integration = numeric(),
+  time_imputation = numeric()
 )
 
 # Fill data frame
@@ -221,11 +242,14 @@ for (param_name in names(results)) {
   res <- results[[param_name]]
   mean_sil_score <- mean(res$stab_sil_sum$score, na.rm = TRUE)
   min_sil_score <- min(res$stab_sil_sum$score,na.rm = TRUE)
-  min_sil_score_name <- cluster$celltype[which.min(res$stab_sil_sum$score)]
   max_sil_score <- max(res$stab_sil_sum$score,na.rm = TRUE)
   stab_knn_acc <- res$stab_knn_acc
   stab_knn_acc_bal <- res$stab_knn_acc_bal
   stab_rsme <- res$stab_rsme
+  stab_mae <- res$stab_mae
+  time_integration <- res$time_integration
+  time_imputation <- res$time_imputation
+  
   
   param_values <- unlist(strsplit(param_name, "_"))
   comparison <- rbind(comparison, data.frame(
@@ -234,16 +258,19 @@ for (param_name in names(results)) {
     maxFeatures = as.numeric(param_values[6]),
     scale.center = as.logical(param_values[8]),
     scale.scale = as.logical(param_values[10]),
+    project_all = as.logical(param_values[13]),
     mean_sil_score = mean_sil_score,
     min_sil_score = min_sil_score,
-    min_sil_score_name = min_sil_score_name,
     max_sil_score = max_sil_score,
     stab_knn_acc = stab_knn_acc,
     stab_knn_acc_bal = stab_knn_acc_bal,
-    stab_rsme = stab_rsme
+    stab_rsme = stab_rsme,
+    stab_mae = stab_mae,
+    time_integration = time_integration,
+    time_imputation = time_imputation
   ))
 }
 
 print(comparison)
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/comparison.txt")
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison.txt")

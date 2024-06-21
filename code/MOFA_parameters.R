@@ -89,21 +89,19 @@ model_opts <- get_default_model_options(model)
 # train_opts <- get_default_training_options(MOFAobject)
 
 #---------------------------Parameters------------------------------------------
-# V1
-# param_grid <- expand.grid(
-#   scale_views = c(TRUE,FALSE),
-#   num_factors = c(10, 15, 20, 30, 40, 50)
-# )
 
-# V2
-param_grid <- expand.grid(
-  scale_views = c(FALSE),
-  num_factors = c(20, 30),
-  # spikeslab_factors = c(TRUE, FALSE),
-  spikeslab_weights = c(TRUE,FALSE),
-  ard_factors = c(TRUE,FALSE), # gruppen ebene
-  ard_weights = c(TRUE,FALSE)
-)
+
+ param_grid <- expand.grid(
+   scale_views = c(TRUE,FALSE),
+   num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
+   # spikeslab_factors = c(TRUE, FALSE),
+   spikeslab_weights = c(TRUE,FALSE)
+   # ard_factors = c(TRUE,FALSE), # gruppen ebene
+   # ard_weights = c(TRUE,FALSE)
+ )
+
+
+
 
 # Overview of parameters:
 # scale_groups: if groups have different ranges/variances, it is good practice to scale each group to unit variance. Default is FALSE -> only have one group anyway
@@ -138,31 +136,23 @@ for (i in 1:nrow(param_grid)) {
   params <- param_grid[i, ]
   
   # Print current parameters 
-  # V1
-  # cat("Running MOFA with scale_views =", params$scale_views,
-  #     ", num_factors =", params$num_factors, "\n")
-  
-  # V2
+
   cat("Running MOFA with scale_views =", params$scale_views,
       ", num_factors =", params$num_factors,
       # ", spikeslab_factors =", params$spikeslab_factors,
-      ", spikeslab_weights =", params$spikeslab_weights,
-      ", ard_factors =", params$ard_factors,
-      ", ard_weights =", params$ard_weights)
+      ", spikeslab_weights =", params$spikeslab_weights)
+      # ", ard_factors =", params$ard_factors,
+      # ", ard_weights =", params$ard_weights)
   
 
   # Run MOFA with current parameters
-  # V1
-  # data_opts$scale_views <- params$scale_views
-  # model_opts$num_factors <- params$num_factors
-  
-  #V2
+
   data_opts$scale_views <- params$scale_views
   model_opts$num_factors <- params$num_factors
   # model_opts$spikeslab_factors <- params$spikeslab_factors
   model_opts$spikeslab_weights <- params$spikeslab_weights
-  model_opts$ard_factors <- params$ard_factors
-  model_opts$ard_factors <- params$ard_weights
+  # model_opts$ard_factors <- params$ard_factors
+  # model_opts$ard_factors <- params$ard_weights
      
     
   MOFAobject <- prepare_mofa(model, 
@@ -172,7 +162,7 @@ for (i in 1:nrow(param_grid)) {
   trained_model <- run_mofa(MOFAobject, use_basilisk = TRUE)
   
   # UMAP
-  trained_model <- run_umap(trained_model)
+  time_integration <- system.time(trained_model <- run_umap(trained_model))
   mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
   
   mofa_umap <- merge(trained_model@dim_red$UMAP, all_celltypes, by = 0)  %>%
@@ -190,6 +180,7 @@ for (i in 1:nrow(param_grid)) {
   
   # Clustering stats
   mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
+  dunn <- mofa_cluster_stats$dunn
   
   # Cell Type Accuracy
   rna_train <- mofa_umap$celltype[1:5016]
@@ -205,7 +196,7 @@ for (i in 1:nrow(param_grid)) {
   mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
   
   # RSME
-  trained_model <- impute(trained_model)
+  imputation_time <- system.time(trained_model <- impute(trained_model))
   
   mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
     rownames_to_column("feature") %>%
@@ -216,22 +207,26 @@ for (i in 1:nrow(param_grid)) {
   
   mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
   
-  # Store results
-  # V1
-  # param_str <- paste(
-  #   "scale_views", params$scale_views,
-  #   "num_factor", params$num_factor,
-  #   sep = "_"
-  # )
+  # Comparison Baseline
   
-  # V2
+  mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
+    rownames_to_column("feature") %>%
+    pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+    full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))) %>%
+                rownames_to_column("feature")) %>%
+    rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))`)
+  
+  mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
+  
+  # Store results
+
   param_str <- paste(
     "scale_views", params$scale_views,
     "num_factor", params$num_factor,
     # "spikeslab_factors", params$spikeslab_factors,
     "spikeslab_weights", params$spikeslab_weights,
-    "ard_factors", params$ard_factors,
-    "ard_weights", params$ard_weights,
+    # "ard_factors", params$ard_factors,
+    # "ard_weights", params$ard_weights,
     sep = "_"
   )
   
@@ -239,10 +234,14 @@ for (i in 1:nrow(param_grid)) {
   results[[param_str]] <- list(
     mofa_umap = mofa_umap,
     mofa_sil_sum = mofa_sil_sum,
+    dunn = dunn,
     mofa_cluster_stats = mofa_cluster_stats,
     mofa_knn_acc = mofa_knn_acc,
     mofa_knn_acc_bal = mofa_knn_acc_bal,
-    mofa_rsme = mofa_rsme
+    mofa_rsme = mofa_rsme,
+    mofa_mae = mofa_mae,
+    time_integration = time_integration[3],
+    imputation_time = imputation_time[3]
   )
   
   
@@ -250,34 +249,24 @@ for (i in 1:nrow(param_grid)) {
 
 #---------------------------Comparison results----------------------------------
 # Create data frame
-# V1
-# comparison <- data.frame(
-#   scale_views = logical(),
-#   num_factor = integer(),
-#   mean_sil_score = numeric(),
-#   min_sil_score = numeric(),
-#   min_sil_score_name = character(),
-#   max_sil_score = numeric(),
-#   mofa_knn_acc = numeric(),
-#   mofa_knn_acc_bal = numeric(),
-#   mofa_rsme = numeric()
-# )
 
-# V2
 comparison <- data.frame(
   scale_views = logical(),
   num_factor = integer(),
   # spikeslab_factors = logical(),
   spikeslab_weights = logical(),
-  ard_factors = logical(),
-  ard_weights = logical(),
+  # ard_factors = logical(),
+  # ard_weights = logical(),
   mean_sil_score = numeric(),
   min_sil_score = numeric(),
-  min_sil_score_name = character(),
   max_sil_score = numeric(),
+  dunn = numeric(),
   mofa_knn_acc = numeric(),
   mofa_knn_acc_bal = numeric(),
-  mofa_rsme = numeric()
+  mofa_rsme = numeric(),
+  mofa_mae = numeric(),
+  time_integration = numeric(),
+  imputation_time = numeric()
 )
 
 # Fill data frame
@@ -285,52 +274,43 @@ for (param_name in names(results)) {
   res <- results[[param_name]]
   mean_sil_score <- mean(res$mofa_sil_sum$score, na.rm = TRUE)
   min_sil_score <- min(res$mofa_sil_sum$score,na.rm = TRUE)
-  min_sil_score_name <- cluster$celltype[which.min(res$mofa_sil_sum$score)]
   max_sil_score <- max(res$mofa_sil_sum$score,na.rm = TRUE)
+  dunn <- res$dunn
   mofa_knn_acc <- res$mofa_knn_acc
   mofa_knn_acc_bal <- res$mofa_knn_acc_bal
   mofa_rsme <- res$mofa_rsme
+  mofa_mae <- res$mofa_mae
+  time_integration <- res$time_integration
+  imputation_time <- res$imputation_time
   
   param_values <- unlist(strsplit(param_name, "_"))
-  # V1
-  # comparison <- rbind(comparison, data.frame(
-  #   scale_views = as.logical(param_values[3]),
-  #   num_factor = as.numeric(param_values[6]),
-  #   mean_sil_score = mean_sil_score,
-  #   min_sil_score = min_sil_score,
-  #   min_sil_score_name = min_sil_score_name,
-  #   max_sil_score = max_sil_score,
-  #   mofa_knn_acc = mofa_knn_acc,
-  #   mofa_knn_acc_bal = mofa_knn_acc_bal,
-  #   mofa_rsme = mofa_rsme
-  # ))
-  
-  # V2
+
   comparison <- rbind(comparison, data.frame(
     scale_views = as.logical(param_values[3]),
     num_factor = as.numeric(param_values[6]),
     # spikeslab_factors = as.logical(param_values[9]),
     spikeslab_weights = as.logical(param_values[9]),
-    ard_factors = as.logical(param_values[12]),
-    ard_weights = as.logical(param_values[15]),
+    # ard_factors = as.logical(param_values[12]),
+    # ard_weights = as.logical(param_values[15]),
     mean_sil_score = mean_sil_score,
     min_sil_score = min_sil_score,
-    min_sil_score_name = min_sil_score_name,
     max_sil_score = max_sil_score,
+    dunn = dunn,
     mofa_knn_acc = mofa_knn_acc,
     mofa_knn_acc_bal = mofa_knn_acc_bal,
-    mofa_rsme = mofa_rsme
+    mofa_rsme = mofa_rsme,
+    mofa_mae = mofa_mae,
+    time_integration = time_integration,
+    imputation_time = imputation_time
   ))
 
 }
 
 print(comparison)
 
-# V1
-# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
 
-# V2
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_model_comparison.txt")
+
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
 
 
 

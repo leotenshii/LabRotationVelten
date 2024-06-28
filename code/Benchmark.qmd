@@ -149,13 +149,15 @@ samples_metadata(model) <- as.data.frame(metadata) %>%
                               mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) # 1 is TRUE, 0 is FALSE
 plot_data_overview(model)
 
+
 model_opts <- get_default_model_options(model)
-model_opts$num_factors <- 30
+model_opts$num_factors <- 15
+model_opts$spikeslab_weights <- TRUE
 MOFAobject <- prepare_mofa(model,
                            model_options = model_opts)
 
- # set.seed(42)
- # run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
+  # set.seed(42)
+  # run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
 
 trained_model <- load_model("~/R/Data/model.hdf5")
 
@@ -285,7 +287,6 @@ stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_uma
 mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
 ```
 
-
 ## Celltype accuracy (from StabMap paper)
 
 Given a joint embedding, we perform a simulation such that discrete class labels corresponding to cell types are artificially removed (atac_query are the "removed" ones) for a subset of the data. We then perform k-nearest neighbors classification (k=5) to obtain the predicted class label for the artificially unlabeled data. The cell type classification accuracy is thus the proportion of cells for which the classification is correct compared to the true cell type label
@@ -394,7 +395,7 @@ stab_baseline_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
                         pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
                         full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))) %>%
                             rownames_to_column("feature")) %>%
-                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")])))`)
+                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))`)
 
 stab_mae <- mean(abs(stab_baseline_comp$predicted - stab_baseline_comp$baseline))
 
@@ -404,8 +405,50 @@ mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(nco
                   pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
                         full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))) %>%
                             rownames_to_column("feature")) %>%
-                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), names %in% c("ATAC")])))`)
+                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))`)
 
 mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
 ```
 
+Plots for a random feature
+
+```{r}
+stab_baseline_comp %>%
+  filter(feature == "chr1:994735-1006799") %>%
+  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+  mutate(diff = (predicted - baseline)) %>%
+  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+    ggplot() +
+  geom_col(aes(x = sample, y = diff, fill = celltype)) 
+
+
+
+mofa_baseline_comp %>%
+  filter(feature == "chr1:994735-1006799") %>%
+  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+  mutate(diff = (predicted - baseline)) %>%
+  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+    ggplot() +
+  geom_col(aes(x = sample, y = diff, fill = celltype)) 
+
+
+# Comparing with the diff of the actual and predicted values
+mofa_baseline_comp %>%
+  filter(feature == "chr1:994735-1006799") %>%
+  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+  left_join(mofa_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
+  mutate(diff = (actual - predicted)) %>%
+  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+    ggplot() +
+  geom_col(aes(x = sample, y = diff, fill = celltype)) 
+
+stab_baseline_comp %>%
+  filter(feature == "chr1:994735-1006799") %>%
+  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+  left_join(stab_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
+  mutate(diff = (actual - predicted)) %>%
+  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+    ggplot() +
+  geom_col(aes(x = sample, y = diff, fill = celltype))
+
+```

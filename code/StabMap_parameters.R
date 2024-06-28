@@ -45,6 +45,7 @@ decomp <- modelGeneVar(sce.rna)
 hvgs <- rownames(decomp)[decomp$mean>0.01 & decomp$p.value <= 0.05]
 
 sce.rna <- sce.rna[hvgs,]
+sce.rna <- scale(sce.rna@assays@data@listData$logcounts)
 
 
 # Normalization ATAC
@@ -57,8 +58,10 @@ hvgs <- rownames(decomp)[decomp$mean>0.25
                          & decomp$p.value <= 0.05]
 
 sce.atac <- sce.atac[hvgs,]
+sce.atac <- scale(sce.atac@assays@data@listData$logcounts)
 
-logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
+#logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
+logcounts_all <- rbind(sce.rna, sce.atac)
 
 
 ## Some general dataframes etc.
@@ -91,9 +94,9 @@ assay_list = list(
 
 #---------------------------Parameters------------------------------------------
 param_grid <- expand.grid(
-  ncomponentsReference = c( 30, 40, 50, 60, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
-  ncomponentsSubset = c( 30, 40, 50, 60, 70),
-  maxFeatures = c(1000, 1500, 1740, 2700), # Too many maybe overfitting
+  ncomponentsReference = c( 15, 30, 40, 50, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
+  ncomponentsSubset = c( 15, 30, 40, 50, 70),
+  maxFeatures = c(1000, 1740, 2700), # Too many maybe overfitting
   scale.center = c(TRUE, FALSE), # False when mean or variance carry some important information?
   scale.scale = c(TRUE, FALSE),
   project_all = c(TRUE, FALSE) # might help in refining the alignment
@@ -108,7 +111,7 @@ results <- list()
 
 #---------------------------Loop------------------------------------------------
 for (i in 1:nrow(param_grid)) {
-  params <- param_grid[1, ]
+  params <- param_grid[i, ]
   
   # Print current parameters 
   cat("Running stabMap with ncomponentsReference =", params$ncomponentsReference,
@@ -273,4 +276,4 @@ for (param_name in names(results)) {
 
 print(comparison)
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison.txt")
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_with_z.txt")

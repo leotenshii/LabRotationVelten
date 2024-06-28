@@ -1,6 +1,9 @@
 ---
-title: "Comparing Prameters"
-format: html
+title: "Benchmark"
+author: "Leoni Zimmermann"
+html:
+  code-fold: true
+  code-summary: "Show the code"
 editor: visual
 ---
 
@@ -8,109 +11,684 @@ editor: visual
 
 ```{r}
 suppressMessages(c(library(tidyverse),
-                   library(plotly)))
+                   library(plotly),
+                   library(utils),
+                   library(patchwork)))
 ```
 
 ```{r}
-mofa_comparison <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+mofa_comparison <- read.table("~/R/Data/mofa_comparison_z_norm.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
 
 ```
 
-## Scale Data
+## Parameter overview
 
-mean var RNA:
+scale_views
 
-```         
-1.209184
-```
+num_factor
 
-mean var ATAC:
+spikeslab_weights
 
-```         
-0.5261105
-```
-
-Differences between scaling data or not
+## (Mean) Silhoutte score for different number of factors
 
 ```{r}
-diffs <- data.frame(
-  num_factor_diff = mofa_comparison$num_factor[mofa_comparison$scale_views == TRUE] - mofa_comparison$num_factor[mofa_comparison$scale_views == FALSE],
-  mean_sil_score_diff = mofa_comparison$mean_sil_score[mofa_comparison$scale_views == TRUE] - mofa_comparison$mean_sil_score[mofa_comparison$scale_views == FALSE],
-  min_sil_score_diff = mofa_comparison$min_sil_score[mofa_comparison$scale_views == TRUE] - mofa_comparison$min_sil_score[mofa_comparison$scale_views == FALSE],
-  max_sil_score_diff = mofa_comparison$max_sil_score[mofa_comparison$scale_views == TRUE] - mofa_comparison$max_sil_score[mofa_comparison$scale_views == FALSE],
-  mofa_knn_acc_diff = mofa_comparison$mofa_knn_acc[mofa_comparison$scale_views == TRUE] - mofa_comparison$mofa_knn_acc[mofa_comparison$scale_views == FALSE],
-  mofa_knn_acc_bal_diff = mofa_comparison$mofa_knn_acc_bal[mofa_comparison$scale_views == TRUE] - mofa_comparison$mofa_knn_acc_bal[mofa_comparison$scale_views == FALSE],
-  mofa_rsme_diff = mofa_comparison$mofa_rsme[mofa_comparison$scale_views == TRUE] - mofa_comparison$mofa_rsme[mofa_comparison$scale_views == FALSE]
-)
+m1 <- mofa_comparison %>% 
+  group_by(num_factor, scale_views) %>% 
+  mutate(mean = mean(mean_sil_score)) %>%
+  ggplot() +
+  geom_point(aes(x = num_factor, y = mean_sil_score), alpha = 0.25) +
+  geom_point(aes(x = num_factor, y = mean, col = scale_views)) +
+  geom_line(aes(x = num_factor, y = mean, group = scale_views, col = scale_views)) +
+  theme_classic() +
+  labs(title = "Mean silhoutte score for different number of factors", 
+      subtitle= "Colored by scale_views FALSE or TRUE")
 
-print(diffs)
+m2 <- mofa_comparison %>% 
+  group_by(num_factor, spikeslab_weights ) %>% 
+  mutate(mean = mean(mean_sil_score)) %>%
+  ggplot() +
+  geom_point(aes(x = num_factor, y = mean_sil_score), alpha = 0.25) +
+  geom_point(aes(x = num_factor, y = mean ,col = spikeslab_weights)) +
+  geom_line(aes(x = num_factor, y = mean, group = spikeslab_weights ,col = spikeslab_weights)) +
+  theme_classic()+
+  labs(title = "Mean silhoutte score for different number of factors", 
+      subtitle= "Seperated by spikeslab_weights FALSE or TRUE")
+
+m3 <- mofa_comparison %>% 
+  group_by(num_factor ) %>% 
+  mutate(mean = mean(mean_sil_score)) %>%
+  ggplot() +
+  geom_point(aes(x = num_factor, y = mean_sil_score), alpha = 0.25) +
+  geom_point(aes(x = num_factor, y = mean), col = "red") +
+  geom_line(aes(x = num_factor, y = mean, group = 1 ), col = "red") +
+  theme_classic()+
+  labs(title = "Mean silhoutte score for different number of factors")
 ```
-
-Difference not really big --\> Take the FALSE ones (is the default)
 
 ```{r}
-mofa_comparison_plot <- mofa_comparison %>% 
-                          filter(scale_views == FALSE) %>%
-                          select(-c(scale_views, min_sil_score_name)) %>%
-                          pivot_longer(-num_factor, names_to = "metric") %>%
-                          ggplot(aes(fill = as.factor(num_factor),
-                                     x = metric, 
-                                     y = value))+
-                          geom_bar(position="dodge", stat="identity")
+m4 <- mofa_comparison %>% 
+  group_by(num_factor, scale_views) %>% 
+  mutate(mean = mean(mofa_rsme)) %>%
+  ggplot() +
+  geom_point(aes(x = num_factor, y = mofa_rsme), alpha = 0.25) +
+  geom_point(aes(x = num_factor, y = mean, col = scale_views)) +
+  geom_line(aes(x = num_factor, y = mean, group = scale_views, col = scale_views)) +
+  theme_classic() +
+  labs(title = "RSME for different number of factors", 
+      subtitle= "Colored by scale_views FALSE or TRUE")
 
-# ggplot(aes(fill = metric, x = num_factor, y = value))+
-#                         geom_bar(position="dodge", stat="identity")
-ggplotly(mofa_comparison_plot)
+m5 <- mofa_comparison %>% 
+  group_by(num_factor, spikeslab_weights ) %>% 
+  mutate(mean = mean(mofa_rsme)) %>%
+  ggplot() +
+  geom_point(aes(x = num_factor, y = mofa_rsme), alpha = 0.25) +
+  geom_point(aes(x = num_factor, y = mean ,col = spikeslab_weights)) +
+  geom_line(aes(x = num_factor, y = mean, group = spikeslab_weights ,col = spikeslab_weights)) +
+  theme_classic()+
+  labs(title = "RSME for different number of factors", 
+      subtitle= "Seperated by spikeslab_weights FALSE or TRUE")
+
+m6 <- mofa_comparison %>% 
+  group_by(num_factor ) %>% 
+  mutate(mean = mean(mofa_rsme)) %>%
+  ggplot() +
+  geom_point(aes(x = num_factor, y = mofa_rsme), alpha = 0.25) +
+  geom_point(aes(x = num_factor, y = mean), col = "red") +
+  geom_line(aes(x = num_factor, y = mean, group = 1 ), col = "red") +
+  theme_classic()+
+  labs(title = "RSME for different number of factors")
 ```
 
-num_factor 20 or 30 look best
+```{r fig.height=10, fig.width=10}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+print((m1 + m2 + m3) / (m4 + m5 + m6) + plot_annotation(title = 'Influence of different number of factors for integration and imputation with MOFA'))
+```
+
+## Plots for all metrics
+
+Now for all different metrics in respect to num_factor and scale_views.
+
+```{r}
+for (i in 1:10) {
+  var_name <- colnames(mofa_comparison)[3+i]
+  
+  m <- mofa_comparison %>% 
+        group_by(num_factor, scale_views) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        geom_point(aes(x = num_factor, y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = num_factor, y = mean), col = "red") +
+        geom_line(aes(x = num_factor, y = mean, group = 1), col = "red") +
+        theme_classic() +
+        facet_grid(cols = vars(scale_views)) +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  assign(paste0("m", i+6), m)
+}
+
+print((m7+m8+m9+m10+m11)/ (m12+m13+m14+m15+m16))
+```
+
+15 is often the best. Result seem to heavily depend on the num_factor
+
+## Best parameters? (Be careful not 50/50 integration/imputation)
+
+```{r}
+min_parameters <- c("mofa_rsme", "mofa_mae", "time_integration", "imputation_time")
+max_parameters <- c("mean_sil_score", "min_sil_score", "max_sil_score", "dunn", "mofa_knn_acc", "mofa_knn_acc_bal" )
+```
+
+Normalize the values of the metrics (between 0 and 1) and take the mean for each parameter set
+
+```{r}
+mofa_comparison %>%
+  mutate(parameters = paste("num_factor", num_factor, 
+                            "| scale_views: ", scale_views, 
+                            "| spikeslab_weights: ", spikeslab_weights )) %>%
+  pivot_longer( cols = mean_sil_score:imputation_time,
+                names_to = "metric",
+                values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% min_parameters ~ (max(value) - value) / (max(value) - min(value))))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score))
+```
+
+Remove the time metrices:
+
+```{r}
+mofa_comparison %>%
+  select(-c(imputation_time, time_integration)) %>%
+  mutate(parameters = paste("num_factor", num_factor, 
+                            "| scale_views: ", scale_views, 
+                            "| spikeslab_weights: ", spikeslab_weights )) %>%
+pivot_longer( cols = mean_sil_score:mofa_mae,
+                names_to = "metric",
+                values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% min_parameters ~ (max(value) - value) / (max(value) - min(value))))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score))
+```
+
+First one still the same
+
+Now for only the integration metrics:
+
+```{r}
+mofa_comparison %>%
+  select(-c(imputation_time, time_integration, mofa_mae, mofa_rsme)) %>%
+  mutate(parameters = paste("num_factor", num_factor, 
+                            "| scale_views: ", scale_views, 
+                            "| spikeslab_weights: ", spikeslab_weights )) %>%
+pivot_longer( cols = mean_sil_score:mofa_knn_acc_bal,
+                names_to = "metric",
+                values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% min_parameters ~ (max(value) - value) / (max(value) - min(value))))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score))
+```
+
+Still the same one first
+
+Only for imputation:
+
+```{r}
+mofa_comparison %>%
+  select(c( mofa_mae, mofa_rsme, scale_views, num_factor, spikeslab_weights)) %>%
+  mutate(parameters = paste("num_factor", num_factor, 
+                            "| scale_views: ", scale_views, 
+                            "| spikeslab_weights: ", spikeslab_weights )) %>%
+pivot_longer( cols = mofa_rsme:mofa_mae,
+                names_to = "metric",
+                values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% min_parameters ~ (max(value) - value) / (max(value) - min(value))))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score))
+```
 
 # StabMap
 
 ```{r}
 
-stab_comparison <- read.table("~/R/Data/comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+stab_comparison <- read.table("~/R/Data/stab_comparison_with_z.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+
+```
+
+## (Mean) Silhoutte score for different number of factors
+
+Mean silhoutte score for different number of PC for Reference
+
+```{r}
+stab_comparison %>% 
+  group_by(ncomponentsReference,ncomponentsSubset) %>% 
+  mutate(mean = mean(mean_sil_score)) %>%
+  ggplot() +
+  geom_point(aes(x = ncomponentsReference, y = mean_sil_score), alpha = 0.25) +
+  geom_point(aes(x = ncomponentsReference, y = mean), col = "red") +
+  geom_line(aes(x = ncomponentsReference, y = mean, group = 1), col = "red") +
+  facet_grid(cols = vars(ncomponentsSubset)) +
+  theme_classic() +
+  labs(title = "Mean silhoutte score for different number of ncomponentsReference", 
+      subtitle= "Seperated by ncomponentsSubset")
+```
+
+30/40 seem to be the best, PC from Subset dont make a difference. For RSME, higher PC are better (butt very small diff)
+
+Now mean_silhoutte score for PC Subset
+
+```{r}
+stab_comparison %>% 
+  group_by(ncomponentsSubset) %>% 
+  mutate(mean = mean(mean_sil_score)) %>%
+  ggplot() +
+  geom_point(aes(x = ncomponentsSubset, y = mean_sil_score), alpha = 0.25) +
+  geom_point(aes(x = ncomponentsSubset, y = mean), col = "red") +
+  geom_line(aes(x = ncomponentsSubset, y = mean, group = 1), col = "red")  +
+  theme_classic() +
+  labs(title = "Mean silhoutte score for different number of ncomponentsSubset")
+```
+
+Difference in the hundredths --\> no so important, same for RSME
+
+```{r}
+stab_comparison %>% 
+  group_by(ncomponentsReference, ncomponentsSubset) %>% 
+  mutate(mean = mean(mean_sil_score)) %>%
+  ggplot() +
+  geom_point(aes(x = ncomponentsReference, y = mean_sil_score, col = scale.scale ), alpha = 0.25) +
+  #geom_point(aes(x = ncomponentsReference, y = mean_sil_score, col = scale.center ), alpha = 0.25) +
+  #geom_point(aes(x = ncomponentsReference, y = mean_sil_score, col = project_all  ), alpha = 0.25) +
+  geom_point(aes(x = ncomponentsReference, y = mean), col = "red") +
+  geom_line(aes(x = ncomponentsReference, y = mean, group = ncomponentsSubset), col = "red") +
+  facet_grid(cols = vars(ncomponentsSubset)) +
+  theme_classic() +
+  labs(title = "Mean silhoutte score for different number of principal components", 
+      subtitle= "Seperated by xxx")
+```
+
+The lower groups of points mostly have scale.scale = FALSE, scale.center FALSE and mixed for project_all
+
+## Plots for all metrices for different parameters
+
+Mean of all metrics for maxFeatures
+
+```{r}
+for (i in 1:9) {
+  var_name <- colnames(stab_comparison)[6+i]
+  
+  p <- stab_comparison %>% 
+        group_by(maxFeatures) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        #geom_point(aes(x = maxFeatures, y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = maxFeatures, y = mean), col = "red") +
+        geom_line(aes(x = maxFeatures, y = mean, group = 1), col = "red") +
+        theme_classic() +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  print(p)
+}
+```
+
+Max features seems to have no significant effect
+
+For the others:
+
+```{r}
+for (i in 1:9) {
+  var_name <- colnames(stab_comparison)[6+i]
+  
+  p <- stab_comparison %>% 
+        group_by(project_all ) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        geom_point(aes(x = project_all , y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = project_all , y = mean), col = "red") +
+        geom_line(aes(x = project_all , y = mean, group = 1), col = "red") +
+        theme_classic() +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  print(p)
+}
+
+```
+
+Only small differences, FALSE seems to be a little bit better
+
+```{r}
+for (i in 1:9) {
+  var_name <- colnames(stab_comparison)[6+i]
+  
+  p <- stab_comparison %>% 
+        group_by(scale.scale ) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        #geom_point(aes(x = scale.scale , y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = scale.scale , y = mean), col = "red") +
+        geom_line(aes(x = scale.scale, y = mean, group = 1), col = "red") +
+        theme_classic() +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  print(p)
+}
+```
+
+scale.scale does not have the biggest effect, but seems better with it being FALSE
+
+```{r}
+for (i in 1:9) {
+  var_name <- colnames(stab_comparison)[6+i]
+  
+  p <- stab_comparison %>% 
+        group_by(scale.center) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        #geom_point(aes(x = scale.center, y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = scale.center, y = mean), col = "red") +
+        geom_line(aes(x = scale.center, y = mean, group = 1), col = "red") +
+        theme_classic() +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  print(p)
+}
+```
+
+scale.center seems to be unimportant
+
+```{r}
+for (i in 1:9) {
+  var_name <- colnames(stab_comparison)[6+i]
+  
+  p <- stab_comparison %>% 
+        group_by(ncomponentsReference) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        #geom_point(aes(x = ncomponentsReference, y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = ncomponentsReference, y = mean), col = "red") +
+        geom_line(aes(x = ncomponentsReference, y = mean, group = 1), col = "red") +
+        theme_classic() +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  print(p)
+}
+```
+
+ncomponentsReference has a greater effect on integration than imputation, 40 has highest sil_score
+
+```{r}
+for (i in 1:9) {
+  var_name <- colnames(stab_comparison)[6+i]
+  
+  p <- stab_comparison %>% 
+        group_by(ncomponentsSubset) %>%
+        mutate(mean = mean(.data[[var_name]])) %>%
+        ggplot() +
+        #geom_point(aes(x = ncomponentsSubset, y = .data[[var_name]]), alpha = 0.25) +
+        geom_point(aes(x = ncomponentsSubset, y = mean), col = "red") +
+        geom_line(aes(x = ncomponentsSubset, y = mean, group = 1), col = "red") +
+        theme_classic() +
+        ggtitle(paste("Plot for column:", var_name)) 
+  
+  print(p)
+}
+```
+
+ncomponentsSubset seems not significant at all.
+
+## Best parameters? (Be careful not 50/50 integration/imputation)
+
+```{r}
+stab_min_parameters <- c("stab_rsme", "stab_mae", "time_integration", "time_imputation")
+stab_max_parameters <- c("mean_sil_score", "min_sil_score", "max_sil_score",  "stab_knn_acc", "stab_knn_acc_bal" )
+```
+
+With all metrics
+
+```{r}
+stab_comparison %>%
+  mutate(parameters = paste("ncomponentsReference: ", ncomponentsReference, 
+                            "| ncomponentsSubset: ",       ncomponentsSubset, 
+                            "| maxFeatures: ",       maxFeatures, 
+                            "| scale.center: ",       scale.center, 
+                            "| scale.scale: ",       scale.scale, 
+                            "| project_all: ",       project_all )) %>%
+  pivot_longer(
+    cols = mean_sil_score:time_imputation,
+    names_to = "metric",
+    values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% stab_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% stab_min_parameters ~ (max(value) - value) / (max(value) - min(value))
+  ))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score)) %>% 
+  slice(1:10)
+```
+
+(Top 10) ncomponentsReference is \<40 , scale.center mixed and scale.scale FALSE. Project_all TRUE PC Subset and maxFeatures seem rather random
+
+Look at it without the times
+
+```{r}
+stab_comparison %>%
+  select(-c(time_integration, time_imputation)) %>%
+  mutate(parameters = paste("ncomponentsReference: ", ncomponentsReference, 
+                            "| ncomponentsSubset: ",       ncomponentsSubset, 
+                            "| maxFeatures: ",       maxFeatures, 
+                            "| scale.center: ",       scale.center, 
+                            "| scale.scale: ",       scale.scale, 
+                            "| project_all: ",       project_all )) %>%
+  pivot_longer(
+    cols = mean_sil_score:stab_mae,
+    names_to = "metric",
+    values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% stab_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% stab_min_parameters ~ (max(value) - value) / (max(value) - min(value))
+  ))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score)) %>% 
+  slice(1:10)
+```
+
+Again: (Top 10) ncomponentsReference is \<40 and one 70, scale.center mixed and scale.scale FALSE Project_all TRUE PC Subset and maxFeatures again seem rather random
+
+Now only for integration:
+
+```{r}
+stab_comparison %>%
+  select(-c(time_integration, time_imputation, stab_rsme, stab_mae)) %>%
+  mutate(parameters = paste("ncomponentsReference: ", ncomponentsReference, 
+                            "| ncomponentsSubset: ",       ncomponentsSubset, 
+                            "| maxFeatures: ",       maxFeatures, 
+                            "| scale.center: ",       scale.center, 
+                            "| scale.scale: ",       scale.scale, 
+                            "| project_all: ",       project_all )) %>%
+  pivot_longer(
+    cols = mean_sil_score:stab_knn_acc_bal,
+    names_to = "metric",
+    values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = case_when(
+    metric %in% stab_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+    metric %in% stab_min_parameters ~ (max(value) - value) / (max(value) - min(value))
+  ))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score)) %>% 
+  slice(1:10)
+```
+
+Again: (Top 10) ncomponentsReference is 40 and 70 mixed, scale.center mixed and scale.scale FALSE Project_all mixed PC Subset and maxFeatures again seem rather random
+
+Integration time taken into account: ncomponentsReference is \<50 (mostly 30/40), scale.center FALSE and scale.scale FALSE (mostly). Project_all mixed
+
+Only for imputation:\
+
+```{r}
+stab_comparison %>%
+  select(-c(mean_sil_score, min_sil_score, max_sil_score, stab_knn_acc, stab_knn_acc_bal, time_integration, time_imputation)) %>%
+  mutate(parameters = paste("ncomponentsReference: ", ncomponentsReference, 
+                            "| ncomponentsSubset: ",       ncomponentsSubset, 
+                            "| maxFeatures: ",       maxFeatures, 
+                            "| scale.center: ",       scale.center, 
+                            "| scale.scale: ",       scale.scale, 
+                            "| project_all: ",       project_all )) %>%
+  pivot_longer(
+    cols = c(stab_rsme:stab_mae),
+    names_to = "metric",
+    values_to = "value") %>%
+  group_by(metric) %>%
+  mutate(normalized_value = (max(value) - value) / (max(value) - min(value)))%>%
+  group_by(parameters) %>%
+  summarize(combined_score = mean(normalized_value, na.rm = TRUE)) %>%
+  arrange(desc(combined_score)) %>% 
+  slice(1:10)
+```
+
+ncomponentsReference 40, scale.center/ scale.scale FALSE . Project_all TRUE. PC Subset and maxFeatures again seem rather random
+
+When imp time is taken into account: PC Ref \<50, scale center mixed, scale scale FALSE, project_all TRUE
+
+## Other way of depicting of nComponents Influence on the mean silhoutee score
+
+```{r}
 
 ```
 
 ```{r}
-rbind(
-stab_comparison[which.max(stab_comparison$mean_sil_score),],
-stab_comparison[which.max(stab_comparison$min_sil_score),],
-stab_comparison[which.max(stab_comparison$max_sil_score),],
-stab_comparison[which.max(stab_comparison$stab_knn_acc_bal),],
-stab_comparison[which.min(stab_comparison$stab_rsme),])
+for (i in 1:5) {
+  var_name <- colnames(stab_comparison)[1 + i]
+  
+  plot_data <- stab_comparison %>%
+    group_by(ncomponentsReference, !!sym(var_name)) %>%
+    summarize(mean = mean(mean_sil_score), .groups = 'drop')
+  
+  p <- ggplot(plot_data) +
+    geom_point(aes(x = ncomponentsReference, 
+                   y = mean, 
+                   col = as.character(!!sym(var_name)))) +
+    geom_line(aes(x = ncomponentsReference, 
+                  y = mean, 
+                  group = !!sym(var_name), 
+                  col = as.character(!!sym(var_name)))) +
+    theme_classic() +
+    ggtitle(paste("Plot for parameter:", var_name))
+  
+  print(p)
+}
+
+
+for (i in 1:5) {
+  var_name <- colnames(stab_comparison[, c(2,1,3:ncol(stab_comparison))])[1 + i]
+  
+  plot_data <- stab_comparison %>%
+    group_by(ncomponentsSubset, !!sym(var_name)) %>%
+    summarize(mean = mean(mean_sil_score), .groups = 'drop')
+  
+  p <- ggplot(plot_data) +
+    geom_point(aes(x = ncomponentsSubset, 
+                   y = mean, 
+                   col = as.character(!!sym(var_name)))) +
+    geom_line(aes(x = ncomponentsSubset, 
+                  y = mean, 
+                  group = !!sym(var_name), 
+                  col = as.character(!!sym(var_name)))) +
+    theme_classic() +
+    ggtitle(paste("Plot for parameter:", var_name))
+  
+  print(p)
+}
+
+
+for (i in 1:5) {
+  var_name <- colnames(stab_comparison[, c(3,1,2,4:ncol(stab_comparison))])[1 + i]
+  
+  plot_data <- stab_comparison %>%
+    group_by(maxFeatures, !!sym(var_name)) %>%
+    summarize(mean = mean(mean_sil_score), .groups = 'drop')
+  
+  p <- ggplot(plot_data) +
+    geom_point(aes(x = maxFeatures, 
+                   y = mean, 
+                   col = as.character(!!sym(var_name)))) +
+    geom_line(aes(x = maxFeatures, 
+                  y = mean, 
+                  group = !!sym(var_name), 
+                  col = as.character(!!sym(var_name)))) +
+    theme_classic() +
+    ggtitle(paste("Plot for parameter:", var_name))
+  
+  print(p)
+}
+```
+
+# Comparing max values for datasets with and without z normalization
+
+```{r}
+stab_comparison_without <- read.table("~/R/Data/stab_comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+mofa_comparison_without <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE, sep = " ", quote = "\"", stringsAsFactors = FALSE)
+
+all_min_parameters <- c("rsme", "mae", "time_integration", "time_imputation")
+all_max_parameters <- c("mean_sil_score", "min_sil_score", "max_sil_score",  "knn_acc", "knn_acc_bal" )
 ```
 
 ```{r}
-stab_comparison %>%
-  arrange(desc(mean_sil_score))%>%
-  top_n( 10, mean_sil_score)
-# Seems scale.center scale.scale should be TRUE, medium ncomponents with max maxFeatures
+stab_value_with_z <- stab_comparison %>%
+                        rename(knn_acc = stab_knn_acc, knn_acc_bal = stab_knn_acc_bal, rsme = stab_rsme, mae = stab_mae )%>%
+                        mutate(parameters = paste("ncomponentsReference: ", ncomponentsReference, 
+                                                  "| ncomponentsSubset: ",       ncomponentsSubset, 
+                                                  "| maxFeatures: ",       maxFeatures, 
+                                                  "| scale.center: ",       scale.center, 
+                                                  "| scale.scale: ",       scale.scale, 
+                                                  "| project_all: ",       project_all )) %>%
+                        pivot_longer(
+                          cols = mean_sil_score:time_imputation,
+                          names_to = "metric",
+                          values_to = "value") %>%
+                        group_by(metric) %>%
+                        mutate(normalized_value = case_when(
+                          metric %in% all_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+                          metric %in% all_min_parameters ~ (max(value) - value) / (max(value) - min(value))
+                        )) %>%
+                        filter(normalized_value == 1) %>%
+                        select(value,metric) %>%
+                        rename(stab_value_with_z = value)
 
-stab_comparison %>%
-  arrange(desc(min_sil_score))%>%
-  top_n( 10, min_sil_score)
+stab_value_without_z <- stab_comparison_without %>%
+                        rename(knn_acc = stab_knn_acc, knn_acc_bal = stab_knn_acc_bal, rsme = stab_rsme, mae = stab_mae )%>%
+                        mutate(parameters = paste("ncomponentsReference: ", ncomponentsReference, 
+                                                  "| ncomponentsSubset: ",       ncomponentsSubset, 
+                                                  "| maxFeatures: ",       maxFeatures, 
+                                                  "| scale.center: ",       scale.center, 
+                                                  "| scale.scale: ",       scale.scale, 
+                                                  "| project_all: ",       project_all )) %>%
+                        pivot_longer(
+                          cols = mean_sil_score:time_imputation,
+                          names_to = "metric",
+                          values_to = "value") %>%
+                        group_by(metric) %>%
+                        mutate(normalized_value = case_when(
+                          metric %in% all_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+                          metric %in% all_min_parameters ~ (max(value) - value) / (max(value) - min(value))
+                        )) %>%
+                        filter(normalized_value == 1) %>%
+                        select(value,metric) %>%
+                        rename(stab_value_without_z = value)
 
-stab_comparison %>%
-  arrange(desc(max_sil_score))%>%
-  top_n( 10, max_sil_score)
-# scale center FALSE, scale.scale TRUE
 
-stab_comparison %>%
-  arrange(desc(stab_knn_acc_bal))%>%
-  top_n( 10, stab_knn_acc_bal)
+mofa_value_with_z <- mofa_comparison %>%
+                        rename(knn_acc = mofa_knn_acc, knn_acc_bal = mofa_knn_acc_bal, rsme = mofa_rsme, mae = mofa_mae, time_imputation = imputation_time ) %>%
+                        mutate(parameters = paste("num_factor", num_factor, 
+                                                  "| scale_views: ", scale_views, 
+                                                  "| spikeslab_weights: ", spikeslab_weights )) %>%
+                        pivot_longer( cols = mean_sil_score:time_imputation,
+                                      names_to = "metric",
+                                      values_to = "value") %>%
+                        group_by(metric) %>%
+                        mutate(normalized_value = case_when(
+                          metric %in% all_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+                          metric %in% all_min_parameters ~ (max(value) - value) / (max(value) - min(value))))%>%
+                        filter(normalized_value == 1) %>%
+                        select(value,metric) %>%
+                        rename(mofa_value_with_z = value)
 
-stab_comparison %>%
-  arrange(stab_rsme)%>%
-  top_n( -10, stab_rsme)
-# Seems scale.center scale.scale should be FALSE, higher numbers of components and features
+mofa_value_without_z <- mofa_comparison_without %>%
+                        rename(knn_acc = mofa_knn_acc, knn_acc_bal = mofa_knn_acc_bal, rsme = mofa_rsme, mae = mofa_mae, time_imputation = imputation_time ) %>%
+                        mutate(parameters = paste("num_factor", num_factor, 
+                                                  "| scale_views: ", scale_views, 
+                                                  "| spikeslab_weights: ", spikeslab_weights )) %>%
+                        pivot_longer( cols = mean_sil_score:time_imputation,
+                                      names_to = "metric",
+                                      values_to = "value") %>%
+                        group_by(metric) %>%
+                        mutate(normalized_value = case_when(
+                          metric %in% all_max_parameters ~ (value - min(value)) / (max(value) - min(value)),
+                          metric %in% all_min_parameters ~ (max(value) - value) / (max(value) - min(value))))%>%
+                        filter(normalized_value == 1) %>%
+                        select(value,metric) %>%
+                        rename(mofa_value_without_z = value)
+
+comp <- inner_join(stab_value_with_z %>% inner_join(stab_value_without_z), mofa_value_with_z %>% inner_join(mofa_value_without_z)) %>% relocate(metric, .before = stab_value_with_z)
 ```
-
-Taking 50,50,1100,TRUE,TRUE for clustering (RSME could be better so maybe
-
-```         
-70                70        1100        FALSE       FALSE
-```
-
-for RSME?)

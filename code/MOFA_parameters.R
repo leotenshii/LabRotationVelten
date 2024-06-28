@@ -36,6 +36,8 @@ decomp <- modelGeneVar(sce.rna)
 hvgs <- rownames(decomp)[decomp$mean>0.01 & decomp$p.value <= 0.05]
 
 sce.rna <- sce.rna[hvgs,]
+# V2
+sce.rna.scaled <- scale(sce.rna@assays@data@listData$logcounts)
 
 
 # Normalization ATAC
@@ -48,15 +50,17 @@ hvgs <- rownames(decomp)[decomp$mean>0.25
                          & decomp$p.value <= 0.05]
 
 sce.atac <- sce.atac[hvgs,]
+#V2
+sce.atac.scaled <- scale(sce.atac@assays@data@listData$logcounts)
 
 logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
-
+logcounts_all_matrix <- rbind(sce.rna.scaled, sce.atac.scaled)
 
 #---------------------------General Data----------------------------------------
 
 # Celltypes of all samples
 all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all))) %>%
-  rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
+  rename( celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
 
 # Clusters as numbers
 cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
@@ -64,10 +68,10 @@ cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n())
 #---------------------------MOFA------------------------------------------------
 
 # Put NAs in data, takes a long time
-# logcounts_allNA <- logcounts_all
-# logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
+logcounts_allNA <- logcounts_all_matrix
+logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
 
-logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
+#logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
 
 # Create list for MOFA
 mofa_list <- list(
@@ -91,14 +95,14 @@ model_opts <- get_default_model_options(model)
 #---------------------------Parameters------------------------------------------
 
 
- param_grid <- expand.grid(
-   scale_views = c(TRUE,FALSE),
-   num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
-   # spikeslab_factors = c(TRUE, FALSE),
-   spikeslab_weights = c(TRUE,FALSE)
-   # ard_factors = c(TRUE,FALSE), # gruppen ebene
-   # ard_weights = c(TRUE,FALSE)
- )
+param_grid <- expand.grid(
+  scale_views = c(TRUE,FALSE),
+  num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
+  # spikeslab_factors = c(TRUE, FALSE),
+  spikeslab_weights = c(TRUE,FALSE)
+  # ard_factors = c(TRUE,FALSE), # gruppen ebene
+  # ard_weights = c(TRUE,FALSE)
+)
 
 
 
@@ -159,10 +163,10 @@ for (i in 1:nrow(param_grid)) {
                              data_options = data_opts,
                              model_options = model_opts)
   
-  trained_model <- run_mofa(MOFAobject, use_basilisk = TRUE)
+  time_integration_all <- system.time(trained_model <- run_mofa(MOFAobject, use_basilisk = TRUE))
   
   # UMAP
-  time_integration <- system.time(trained_model <- run_umap(trained_model))
+  trained_model <- run_umap(trained_model)
   mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
   
   mofa_umap <- merge(trained_model@dim_red$UMAP, all_celltypes, by = 0)  %>%
@@ -196,12 +200,12 @@ for (i in 1:nrow(param_grid)) {
   mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
   
   # RSME
-  imputation_time <- system.time(trained_model <- impute(trained_model))
+  imputation_time_all <- system.time(trained_model <- impute(trained_model))
   
   mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
     rownames_to_column("feature") %>%
     pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-    full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
+    full_join(as.data.frame(as.matrix(logcounts_all_matrix[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
                 rownames_to_column("feature") %>%
                 pivot_longer(-feature, names_to = "sample", values_to = "actual"))
   
@@ -240,8 +244,8 @@ for (i in 1:nrow(param_grid)) {
     mofa_knn_acc_bal = mofa_knn_acc_bal,
     mofa_rsme = mofa_rsme,
     mofa_mae = mofa_mae,
-    time_integration = time_integration[3],
-    imputation_time = imputation_time[3]
+    time_integration = time_integration_all,
+    imputation_time = imputation_time_all
   )
   
   
@@ -280,8 +284,8 @@ for (param_name in names(results)) {
   mofa_knn_acc_bal <- res$mofa_knn_acc_bal
   mofa_rsme <- res$mofa_rsme
   mofa_mae <- res$mofa_mae
-  time_integration <- res$time_integration
-  imputation_time <- res$imputation_time
+  time_integration <- res$time_integration[3]
+  imputation_time <- res$imputation_time[3]
   
   param_values <- unlist(strsplit(param_name, "_"))
 
@@ -310,7 +314,7 @@ print(comparison)
 
 
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_z_norm.txt")
 
 
 

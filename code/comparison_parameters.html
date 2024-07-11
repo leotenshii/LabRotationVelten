@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.433">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Leoni Zimmermann">
+
+<title>Benchmark</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="comparison_parameters_files/libs/clipboard/clipboard.min.js"></script>
+<script src="comparison_parameters_files/libs/quarto-html/quarto.js"></script>
+<script src="comparison_parameters_files/libs/quarto-html/popper.min.js"></script>
+<script src="comparison_parameters_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="comparison_parameters_files/libs/quarto-html/anchor.min.js"></script>
+<link href="comparison_parameters_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="comparison_parameters_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="comparison_parameters_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="comparison_parameters_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="comparison_parameters_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#mofa" id="toc-mofa" class="nav-link active" data-scroll-target="#mofa">MOFA</a>
+  <ul class="collapse">
+  <li><a href="#parameter-overview" id="toc-parameter-overview" class="nav-link" data-scroll-target="#parameter-overview">Parameter overview</a></li>
+  <li><a href="#mean-silhoutte-score-for-different-number-of-factors" id="toc-mean-silhoutte-score-for-different-number-of-factors" class="nav-link" data-scroll-target="#mean-silhoutte-score-for-different-number-of-factors">(Mean) Silhoutte score for different number of factors</a></li>
+  <li><a href="#plots-for-all-metrics" id="toc-plots-for-all-metrics" class="nav-link" data-scroll-target="#plots-for-all-metrics">Plots for all metrics</a></li>
+  <li><a href="#best-parameters-be-careful-not-5050-integrationimputation" id="toc-best-parameters-be-careful-not-5050-integrationimputation" class="nav-link" data-scroll-target="#best-parameters-be-careful-not-5050-integrationimputation">Best parameters? (Be careful not 50/50 integration/imputation)</a></li>
+  </ul></li>
+  <li><a href="#stabmap" id="toc-stabmap" class="nav-link" data-scroll-target="#stabmap">StabMap</a>
+  <ul class="collapse">
+  <li><a href="#mean-silhoutte-score-for-different-number-of-factors-1" id="toc-mean-silhoutte-score-for-different-number-of-factors-1" class="nav-link" data-scroll-target="#mean-silhoutte-score-for-different-number-of-factors-1">(Mean) Silhoutte score for different number of factors</a></li>
+  <li><a href="#plots-for-all-metrices-for-different-parameters" id="toc-plots-for-all-metrices-for-different-parameters" class="nav-link" data-scroll-target="#plots-for-all-metrices-for-different-parameters">Plots for all metrices for different parameters</a></li>
+  <li><a href="#best-parameters-be-careful-not-5050-integrationimputation-1" id="toc-best-parameters-be-careful-not-5050-integrationimputation-1" class="nav-link" data-scroll-target="#best-parameters-be-careful-not-5050-integrationimputation-1">Best parameters? (Be careful not 50/50 integration/imputation)</a></li>
+  <li><a href="#other-way-of-depicting-of-ncomponents-influence-on-the-mean-silhoutee-score" id="toc-other-way-of-depicting-of-ncomponents-influence-on-the-mean-silhoutee-score" class="nav-link" data-scroll-target="#other-way-of-depicting-of-ncomponents-influence-on-the-mean-silhoutee-score">Other way of depicting of nComponents Influence on the mean silhoutee score</a></li>
+  </ul></li>
+  <li><a href="#comparing-max-values-for-datasets-with-and-without-z-normalization" id="toc-comparing-max-values-for-datasets-with-and-without-z-normalization" class="nav-link" data-scroll-target="#comparing-max-values-for-datasets-with-and-without-z-normalization">Comparing max values for datasets with and without z normalization</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Benchmark</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Leoni Zimmermann </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="mofa" class="level1">
+<h1>MOFA</h1>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressMessages</span>(<span class="fu">c</span>(<span class="fu">library</span>(tidyverse),</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">library</span>(plotly),</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">library</span>(patchwork),</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">library</span>(knitr)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] "lubridate" "forcats"   "stringr"   "dplyr"     "purrr"     "readr"    
+ [7] "tidyr"     "tibble"    "ggplot2"   "tidyverse" "stats"     "graphics" 
+[13] "grDevices" "utils"     "datasets"  "methods"   "base"      "plotly"   
+[19] "lubridate" "forcats"   "stringr"   "dplyr"     "purrr"     "readr"    
+[25] "tidyr"     "tibble"    "ggplot2"   "tidyverse" "stats"     "graphics" 
+[31] "grDevices" "utils"     "datasets"  "methods"   "base"      "patchwork"
+[37] "plotly"    "lubridate" "forcats"   "stringr"   "dplyr"     "purrr"    
+[43] "readr"     "tidyr"     "tibble"    "ggplot2"   "tidyverse" "stats"    
+[49] "graphics"  "grDevices" "utils"     "datasets"  "methods"   "base"     
+[55] "knitr"     "patchwork" "plotly"    "lubridate" "forcats"   "stringr"  
+[61] "dplyr"     "purrr"     "readr"     "tidyr"     "tibble"    "ggplot2"  
+[67] "tidyverse" "stats"     "graphics"  "grDevices" "utils"     "datasets" 
+[73] "methods"   "base"     </code></pre>
+</div>
+</div>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>mofa_comparison <span class="ot">&lt;-</span> <span class="fu">read.table</span>(<span class="st">"~/R/Data/mofa_comparison_z_norm.txt"</span>, <span class="at">header =</span> <span class="cn">TRUE</span>, <span class="at">sep =</span> <span class="st">" "</span>, <span class="at">quote =</span> <span class="st">"</span><span class="sc">\"</span><span class="st">"</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>mofa_mae)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<section id="parameter-overview" class="level2">
+<h2 class="anchored" data-anchor-id="parameter-overview">Parameter overview</h2>
+<p>scale_views</p>
+<p>num_factor</p>
+<p>spikeslab_weights</p>
+</section>
+<section id="mean-silhoutte-score-for-different-number-of-factors" class="level2">
+<h2 class="anchored" data-anchor-id="mean-silhoutte-score-for-different-number-of-factors">(Mean) Silhoutte score for different number of factors</h2>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>m1 <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(num_factor, scale_views) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean_sil_score), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">col =</span> scale_views)) <span class="sc">+</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> scale_views, <span class="at">col =</span> scale_views)) <span class="sc">+</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Mean silhoutte score for different number of factors"</span>, </span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span> <span class="st">"Colored by scale_views FALSE or TRUE"</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>m2 <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(num_factor, spikeslab_weights ) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean_sil_score), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean ,<span class="at">col =</span> spikeslab_weights)) <span class="sc">+</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> spikeslab_weights ,<span class="at">col =</span> spikeslab_weights)) <span class="sc">+</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Mean silhoutte score for different number of factors"</span>, </span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span> <span class="st">"Colored by spikeslab_weights FALSE or TRUE"</span>)</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>m3 <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(num_factor ) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean_sil_score), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span> ), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Mean silhoutte score for different number of factors"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>m4 <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(num_factor, scale_views) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mofa_rsme)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mofa_rsme), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">col =</span> scale_views)) <span class="sc">+</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> scale_views, <span class="at">col =</span> scale_views)) <span class="sc">+</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"RSME for different number of factors"</span>, </span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span> <span class="st">"Colored by scale_views FALSE or TRUE"</span>)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>m5 <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(num_factor, spikeslab_weights ) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mofa_rsme)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mofa_rsme), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean ,<span class="at">col =</span> spikeslab_weights)) <span class="sc">+</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> spikeslab_weights ,<span class="at">col =</span> spikeslab_weights)) <span class="sc">+</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"RSME for different number of factors"</span>, </span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span> <span class="st">"Colored by spikeslab_weights FALSE or TRUE"</span>)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>m6 <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(num_factor ) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mofa_rsme)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mofa_rsme), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span> ), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"RSME for different number of factors"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>((m1 <span class="sc">+</span> m4)<span class="sc">/</span> (m2 <span class="sc">+</span> m5)<span class="sc">/</span>  (m3 <span class="sc">+</span> m6) <span class="sc">+</span> <span class="fu">plot_annotation</span>(<span class="at">title =</span> <span class="st">'Influence of different number of factors for integration (left) and imputation (right) with MOFA'</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid" width="960"></p>
+</div>
+</div>
+</section>
+<section id="plots-for-all-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="plots-for-all-metrics">Plots for all metrics</h2>
+<p>Now for all different metrics in respect to num_factor and scale_views.</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">9</span>) {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(mofa_comparison)[<span class="dv">3</span><span class="sc">+</span>i]</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  m <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(num_factor, scale_views) <span class="sc">%&gt;%</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> .data[[var_name]], <span class="at">col =</span> spikeslab_weights), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> num_factor, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">facet_grid</span>(<span class="at">cols =</span> <span class="fu">vars</span>(scale_views)) <span class="sc">+</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(m)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-8.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-6-9.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Result seem to heavily depend on the num_factor. For integration low number of factors seem better, for imputation higher number of factors.</p>
+</section>
+<section id="best-parameters-be-careful-not-5050-integrationimputation" class="level2">
+<h2 class="anchored" data-anchor-id="best-parameters-be-careful-not-5050-integrationimputation">Best parameters? (Be careful not 50/50 integration/imputation)</h2>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>min_parameters <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"mofa_rsme"</span>, <span class="st">"mofa_mae"</span>, <span class="st">"time_integration"</span>, <span class="st">"imputation_time"</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>max_parameters <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"mean_sil_score"</span>, <span class="st">"min_sil_score"</span>, <span class="st">"max_sil_score"</span>, <span class="st">"dunn"</span>, <span class="st">"mofa_knn_acc"</span>, <span class="st">"mofa_knn_acc_bal"</span> )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>Normalize the values of the metrics (between 0 and 1) and take the mean for each parameter set</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(mofa_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"num_factor"</span>, num_factor, </span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale_views: "</span>, scale_views, </span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| spikeslab_weights: "</span>, spikeslab_weights )) <span class="sc">%&gt;%</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>          <span class="fu">pivot_longer</span>( <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>imputation_time,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>                        <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>                        <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))))<span class="sc">%&gt;%</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>          <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>          <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>          <span class="fu">head</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 71%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.8453006</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 15 | scale_views: FALSE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.7522405</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: TRUE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.7378964</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 10 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.6851858</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 20 | scale_views: TRUE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.6812559</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 15 | scale_views: TRUE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.6799417</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Remove the time metrices:</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(mofa_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>            <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(imputation_time, time_integration)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>            <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"num_factor"</span>, num_factor, </span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>                                      <span class="st">"| scale_views: "</span>, scale_views, </span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>                                      <span class="st">"| spikeslab_weights: "</span>, spikeslab_weights )) <span class="sc">%&gt;%</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>            <span class="fu">pivot_longer</span>( <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>mofa_rsme,</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>                          <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>                          <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>            <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>            <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>              metric <span class="sc">%in%</span> max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>              metric <span class="sc">%in%</span> min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))))<span class="sc">%&gt;%</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>            <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>            <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>            <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            <span class="fu">head</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 83%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.8676654</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 15 | scale_views: FALSE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.7057357</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: TRUE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.6839401</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 20 | scale_views: TRUE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.6674629</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 20 | scale_views: FALSE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.6417242</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 20 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.6276030</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>First one still the same</p>
+<p>Now for only the integration metrics:</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(mofa_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>            <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(imputation_time, time_integration, mofa_rsme)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>            <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"num_factor"</span>, num_factor, </span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>                                      <span class="st">"| scale_views: "</span>, scale_views, </span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>                                      <span class="st">"| spikeslab_weights: "</span>, spikeslab_weights )) <span class="sc">%&gt;%</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>            <span class="fu">pivot_longer</span>( <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>mofa_knn_acc_bal,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>                          <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>                          <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>            <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>            <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>              metric <span class="sc">%in%</span> max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>              metric <span class="sc">%in%</span> min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))))<span class="sc">%&gt;%</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>            <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>            <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>            <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>            <span class="fu">head</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 83%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.8941877</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 20 | scale_views: TRUE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.7728715</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: TRUE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.7653397</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 15 | scale_views: FALSE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.7572666</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 15 | scale_views: TRUE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.6877872</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 20 | scale_views: FALSE | spikeslab_weights: TRUE</td>
+<td style="text-align: right;">0.6812885</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Still the same one first</p>
+<p>Only for imputation:</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(mofa_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>          <span class="fu">select</span>(<span class="fu">c</span>(  mofa_rsme, scale_views, num_factor, spikeslab_weights)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"num_factor"</span>, num_factor, </span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale_views: "</span>, scale_views, </span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| spikeslab_weights: "</span>, spikeslab_weights )) <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>          <span class="fu">pivot_longer</span>( <span class="at">cols =</span> mofa_rsme,</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>                        <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>                        <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">normalized_value =</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)))<span class="sc">%&gt;%</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>          <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>          <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>          <span class="fu">head</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 83%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">num_factor 40 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">1.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 50 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.9973185</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 60 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.9957348</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 70 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.9943453</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">num_factor 30 | scale_views: FALSE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.9632690</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">num_factor 60 | scale_views: TRUE | spikeslab_weights: FALSE</td>
+<td style="text-align: right;">0.7899034</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<section id="stabmap" class="level1">
+<h1>StabMap</h1>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>stab_comparison <span class="ot">&lt;-</span> <span class="fu">read.table</span>(<span class="st">"~/R/Data/stab_comparison_with_z.txt"</span>, <span class="at">header =</span> <span class="cn">TRUE</span>, <span class="at">sep =</span> <span class="st">" "</span>, <span class="at">quote =</span> <span class="st">"</span><span class="sc">\"</span><span class="st">"</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>stab_mae)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<section id="mean-silhoutte-score-for-different-number-of-factors-1" class="level2">
+<h2 class="anchored" data-anchor-id="mean-silhoutte-score-for-different-number-of-factors-1">(Mean) Silhoutte score for different number of factors</h2>
+<p>Mean silhoutte score for different number of PC for Reference</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ncomponentsReference,ncomponentsSubset) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sd_mean_sil_score =</span> <span class="fu">sd</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference,<span class="at">ymin =</span> (mean <span class="sc">-</span> sd_mean_sil_score), <span class="at">ymax =</span> (mean <span class="sc">+</span> sd_mean_sil_score)), <span class="at">width =</span> <span class="dv">4</span>, <span class="at">col =</span> <span class="st">"azure4"</span>) <span class="sc">+</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(<span class="at">cols =</span> <span class="fu">vars</span>(ncomponentsSubset)) <span class="sc">+</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Mean silhoutte score for different number of ncomponentsReference"</span>, </span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span> <span class="st">"Seperated by ncomponentsSubset"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>30/40 seem to be the best, PC from Subset dont make a difference. For RSME, higher PC are better (butt very small diff)</p>
+<p>Now mean_silhoutte score for PC Subset</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ncomponentsSubset) <span class="sc">%&gt;%</span> </span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sd_mean_sil_score =</span> <span class="fu">sd</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset,<span class="at">ymin =</span> (mean <span class="sc">-</span> sd_mean_sil_score), <span class="at">ymax =</span> (mean <span class="sc">+</span> sd_mean_sil_score)), <span class="at">width =</span> <span class="dv">4</span>, <span class="at">col =</span> <span class="st">"azure4"</span>) <span class="sc">+</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>)  <span class="sc">+</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Mean silhoutte score for different number of ncomponentsSubset"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Difference in the hundredths –&gt; no so important, same for RSME</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ncomponentsReference, ncomponentsSubset) <span class="sc">%&gt;%</span> </span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score)) <span class="sc">%&gt;%</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean_sil_score, <span class="at">col =</span> scale.scale ), <span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_point(aes(x = ncomponentsReference, y = mean_sil_score, col = scale.center ), alpha = 0.25) +</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_point(aes(x = ncomponentsReference, y = mean_sil_score, col = project_all  ), alpha = 0.25) +</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean, <span class="at">group =</span> ncomponentsSubset), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(<span class="at">cols =</span> <span class="fu">vars</span>(ncomponentsSubset)) <span class="sc">+</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Mean silhoutte score for different number of principal components"</span>, </span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle=</span> <span class="st">"Seperated by xxx"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The lower groups of points mostly have scale.scale = TRUE, scale.center TRUE and mixed for project_all</p>
+</section>
+<section id="plots-for-all-metrices-for-different-parameters" class="level2">
+<h2 class="anchored" data-anchor-id="plots-for-all-metrices-for-different-parameters">Plots for all metrices for different parameters</h2>
+<p>Mean of all metrics for maxFeatures</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>) {</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">6</span><span class="sc">+</span>i]</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(maxFeatures) <span class="sc">%&gt;%</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">#geom_point(aes(x = maxFeatures, y = .data[[var_name]]), alpha = 0.25) +</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> maxFeatures, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> maxFeatures, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-16-8.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Max features seems to have no significant effect</p>
+<p>For the others:</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>) {</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">6</span><span class="sc">+</span>i]</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(project_all ) <span class="sc">%&gt;%</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">#geom_point(aes(x = project_all , y = .data[[var_name]]), alpha = 0.25) +</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> project_all , <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> project_all , <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-17-8.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Only small differences, FALSE seems to be a little bit better</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>) {</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">6</span><span class="sc">+</span>i]</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(scale.scale ) <span class="sc">%&gt;%</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">#geom_point(aes(x = scale.scale , y = .data[[var_name]]), alpha = 0.25) +</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> scale.scale , <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> scale.scale, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-18-8.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>scale.scale does not have the biggest effect, but seems better with it being FALSE</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>) {</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">6</span><span class="sc">+</span>i]</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(scale.center) <span class="sc">%&gt;%</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">#geom_point(aes(x = scale.center, y = .data[[var_name]]), alpha = 0.25) +</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> scale.center, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> scale.center, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-19-8.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>scale.center seems to be unimportant</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>) {</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">6</span><span class="sc">+</span>i]</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(ncomponentsReference) <span class="sc">%&gt;%</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">#geom_point(aes(x = ncomponentsReference, y = .data[[var_name]]), alpha = 0.25) +</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-20-8.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>ncomponentsReference has a greater effect on integration than imputation, 40 has highest sil_score</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>) {</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">6</span><span class="sc">+</span>i]</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span> </span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">group_by</span>(ncomponentsSubset) <span class="sc">%&gt;%</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(<span class="at">mean =</span> <span class="fu">mean</span>(.data[[var_name]])) <span class="sc">%&gt;%</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">#geom_point(aes(x = ncomponentsSubset, y = .data[[var_name]]), alpha = 0.25) +</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset, <span class="at">y =</span> mean), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset, <span class="at">y =</span> mean, <span class="at">group =</span> <span class="dv">1</span>), <span class="at">col =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for column:"</span>, var_name)) </span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-21-8.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>ncomponentsSubset seems not significant at all.</p>
+</section>
+<section id="best-parameters-be-careful-not-5050-integrationimputation-1" class="level2">
+<h2 class="anchored" data-anchor-id="best-parameters-be-careful-not-5050-integrationimputation-1">Best parameters? (Be careful not 50/50 integration/imputation)</h2>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>stab_min_parameters <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"stab_rsme"</span>, <span class="st">"time_integration"</span>, <span class="st">"time_imputation"</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>stab_max_parameters <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"mean_sil_score"</span>, <span class="st">"min_sil_score"</span>, <span class="st">"max_sil_score"</span>,  <span class="st">"stab_knn_acc"</span>, <span class="st">"stab_knn_acc_bal"</span> )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<p>With all metrics</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"ncomponentsReference: "</span>, ncomponentsReference, </span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| ncomponentsSubset: "</span>,       ncomponentsSubset, </span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| maxFeatures: "</span>,       maxFeatures, </span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.center: "</span>,       scale.center, </span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.scale: "</span>,       scale.scale, </span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| project_all: "</span>,       project_all )) <span class="sc">%&gt;%</span></span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>          <span class="fu">pivot_longer</span>(</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>            <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>time_imputation,</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> stab_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> stab_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>          ))<span class="sc">%&gt;%</span></span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>          <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>          <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span> </span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a>          <span class="fu">slice</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 91%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 40 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8232928</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 15 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8069152</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 30 | ncomponentsSubset: 50 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8050366</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 30 | maxFeatures: 1000 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8019693</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 70 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.7986014</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 15 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.7974099</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 50 | ncomponentsSubset: 30 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.7957960</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 15 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.7955455</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 40 | maxFeatures: 2700 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.7950156</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 50 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.7947822</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>(Top 10) ncomponentsReference is &lt;40 , scale.center mixed and scale.scale FALSE. Project_all TRUE PC Subset and maxFeatures seem rather random</p>
+<p>Look at it without the times</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>          <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(time_integration, time_imputation)) <span class="sc">%&gt;%</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"ncomponentsReference: "</span>, ncomponentsReference, </span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| ncomponentsSubset: "</span>,       ncomponentsSubset, </span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| maxFeatures: "</span>,       maxFeatures, </span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.center: "</span>,       scale.center, </span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.scale: "</span>,       scale.scale, </span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| project_all: "</span>,       project_all )) <span class="sc">%&gt;%</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>          <span class="fu">pivot_longer</span>(</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>stab_rsme,</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>            <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> stab_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> stab_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>          ))<span class="sc">%&gt;%</span></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>          <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>          <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span> </span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>          <span class="fu">slice</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 91%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 30 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8858919</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 15 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8586674</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 70 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8585197</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 50 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8576633</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 40 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8507154</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 50 | maxFeatures: 1000 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8460550</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 40 | maxFeatures: 2700 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8401522</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 40 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8387942</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 40 | maxFeatures: 1000 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8375590</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 50 | ncomponentsSubset: 70 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8370834</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Again: (Top 10) ncomponentsReference is &lt;40 and one 70, scale.center mixed and scale.scale FALSE Project_all TRUE PC Subset and maxFeatures again seem rather random</p>
+<p>Now only for integration:</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>          <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(time_integration, time_imputation, stab_rsme)) <span class="sc">%&gt;%</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"ncomponentsReference: "</span>, ncomponentsReference, </span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| ncomponentsSubset: "</span>,       ncomponentsSubset, </span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| maxFeatures: "</span>,       maxFeatures, </span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.center: "</span>,       scale.center, </span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.scale: "</span>,       scale.scale, </span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| project_all: "</span>,       project_all )) <span class="sc">%&gt;%</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>          <span class="fu">pivot_longer</span>(</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>stab_knn_acc_bal,</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>            <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> stab_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>            metric <span class="sc">%in%</span> stab_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>          ))<span class="sc">%&gt;%</span></span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>          <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>          <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span> </span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>          <span class="fu">slice</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 91%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 30 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8642462</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 30 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: TRUE</td>
+<td style="text-align: right;">0.8529961</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 40 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8486170</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 70 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: TRUE</td>
+<td style="text-align: right;">0.8377036</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 70 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8348809</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 50 | ncomponentsSubset: 70 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8340494</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 70 | maxFeatures: 2700 | scale.center: TRUE | scale.scale: FALSE | project_all: TRUE</td>
+<td style="text-align: right;">0.8333767</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 15 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8318218</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 40 | ncomponentsSubset: 50 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8317144</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 50 | maxFeatures: 1740 | scale.center: TRUE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.8311079</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Again: (Top 10) ncomponentsReference is 40 and 70 mixed, scale.center mixed and scale.scale FALSE Project_all mixed PC Subset and maxFeatures again seem rather random</p>
+<p>Integration time taken into account: ncomponentsReference is &lt;50 (mostly 30/40), scale.center FALSE and scale.scale FALSE (mostly). Project_all mixed</p>
+<p>Only for imputation:<br>
+</p>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>          <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(mean_sil_score, min_sil_score, max_sil_score, stab_knn_acc, stab_knn_acc_bal, time_integration, time_imputation)) <span class="sc">%&gt;%</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"ncomponentsReference: "</span>, ncomponentsReference, </span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| ncomponentsSubset: "</span>,       ncomponentsSubset, </span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| maxFeatures: "</span>,       maxFeatures, </span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.center: "</span>,       scale.center, </span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| scale.scale: "</span>,       scale.scale, </span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"| project_all: "</span>,       project_all )) <span class="sc">%&gt;%</span></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>          <span class="fu">pivot_longer</span>(</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">cols =</span> <span class="fu">c</span>(stab_rsme),</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>            <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mutate</span>(<span class="at">normalized_value =</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)))<span class="sc">%&gt;%</span></span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>          <span class="fu">group_by</span>(parameters) <span class="sc">%&gt;%</span></span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>          <span class="fu">summarize</span>(<span class="at">combined_score =</span> <span class="fu">mean</span>(normalized_value, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>          <span class="fu">arrange</span>(<span class="fu">desc</span>(combined_score)) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>          <span class="fu">slice</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 91%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">parameters</th>
+<th style="text-align: right;">combined_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 40 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">1.0000000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 40 | maxFeatures: 2700 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9993697</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 70 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9992041</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 15 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9991708</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 50 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9989287</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 15 | maxFeatures: 1740 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9986082</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 30 | maxFeatures: 2700 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9985214</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 50 | maxFeatures: 1000 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9982832</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 50 | maxFeatures: 2700 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9982017</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ncomponentsReference: 70 | ncomponentsSubset: 15 | maxFeatures: 2700 | scale.center: FALSE | scale.scale: FALSE | project_all: FALSE</td>
+<td style="text-align: right;">0.9980637</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>ncomponentsReference 40, scale.center/ scale.scale FALSE . Project_all TRUE. PC Subset and maxFeatures again seem rather random</p>
+<p>When imp time is taken into account: PC Ref &lt;50, scale center mixed, scale scale FALSE, project_all TRUE</p>
+</section>
+<section id="other-way-of-depicting-of-ncomponents-influence-on-the-mean-silhoutee-score" class="level2">
+<h2 class="anchored" data-anchor-id="other-way-of-depicting-of-ncomponents-influence-on-the-mean-silhoutee-score">Other way of depicting of nComponents Influence on the mean silhoutee score</h2>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>) {</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison)[<span class="dv">1</span> <span class="sc">+</span> i]</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  plot_data <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(ncomponentsReference, <span class="sc">!!</span><span class="fu">sym</span>(var_name)) <span class="sc">%&gt;%</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score), <span class="at">.groups =</span> <span class="st">'drop'</span>)</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(plot_data) <span class="sc">+</span></span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, </span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>                   <span class="at">y =</span> mean, </span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>                   <span class="at">col =</span> <span class="fu">as.character</span>(<span class="sc">!!</span><span class="fu">sym</span>(var_name)))) <span class="sc">+</span></span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsReference, </span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>                  <span class="at">y =</span> mean, </span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>                  <span class="at">group =</span> <span class="sc">!!</span><span class="fu">sym</span>(var_name), </span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>                  <span class="at">col =</span> <span class="fu">as.character</span>(<span class="sc">!!</span><span class="fu">sym</span>(var_name)))) <span class="sc">+</span></span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for parameter:"</span>, var_name))</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-5.png" class="img-fluid" width="672"></p>
+</div>
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>) {</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison[, <span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">1</span>,<span class="dv">3</span><span class="sc">:</span><span class="fu">ncol</span>(stab_comparison))])[<span class="dv">1</span> <span class="sc">+</span> i]</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  plot_data <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(ncomponentsSubset, <span class="sc">!!</span><span class="fu">sym</span>(var_name)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score), <span class="at">.groups =</span> <span class="st">'drop'</span>)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(plot_data) <span class="sc">+</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset, </span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>                   <span class="at">y =</span> mean, </span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>                   <span class="at">col =</span> <span class="fu">as.character</span>(<span class="sc">!!</span><span class="fu">sym</span>(var_name)))) <span class="sc">+</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> ncomponentsSubset, </span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>                  <span class="at">y =</span> mean, </span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>                  <span class="at">group =</span> <span class="sc">!!</span><span class="fu">sym</span>(var_name), </span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>                  <span class="at">col =</span> <span class="fu">as.character</span>(<span class="sc">!!</span><span class="fu">sym</span>(var_name)))) <span class="sc">+</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for parameter:"</span>, var_name))</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-8.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-9.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-10.png" class="img-fluid" width="672"></p>
+</div>
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>) {</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  var_name <span class="ot">&lt;-</span> <span class="fu">colnames</span>(stab_comparison[, <span class="fu">c</span>(<span class="dv">3</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">4</span><span class="sc">:</span><span class="fu">ncol</span>(stab_comparison))])[<span class="dv">1</span> <span class="sc">+</span> i]</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  plot_data <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(maxFeatures, <span class="sc">!!</span><span class="fu">sym</span>(var_name)) <span class="sc">%&gt;%</span></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">mean =</span> <span class="fu">mean</span>(mean_sil_score), <span class="at">.groups =</span> <span class="st">'drop'</span>)</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(plot_data) <span class="sc">+</span></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> maxFeatures, </span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>                   <span class="at">y =</span> mean, </span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>                   <span class="at">col =</span> <span class="fu">as.character</span>(<span class="sc">!!</span><span class="fu">sym</span>(var_name)))) <span class="sc">+</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">x =</span> maxFeatures, </span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>                  <span class="at">y =</span> mean, </span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>                  <span class="at">group =</span> <span class="sc">!!</span><span class="fu">sym</span>(var_name), </span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>                  <span class="at">col =</span> <span class="fu">as.character</span>(<span class="sc">!!</span><span class="fu">sym</span>(var_name)))) <span class="sc">+</span></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_classic</span>() <span class="sc">+</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggtitle</span>(<span class="fu">paste</span>(<span class="st">"Plot for parameter:"</span>, var_name))</span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-11.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-12.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-13.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-14.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="comparison_parameters_files/figure-html/unnamed-chunk-28-15.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</section>
+</section>
+<section id="comparing-max-values-for-datasets-with-and-without-z-normalization" class="level1">
+<h1>Comparing max values for datasets with and without z normalization</h1>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>stab_comparison_without <span class="ot">&lt;-</span> <span class="fu">read.table</span>(<span class="st">"~/R/Data/stab_comparison.txt"</span>, <span class="at">header =</span> <span class="cn">TRUE</span>, <span class="at">sep =</span> <span class="st">" "</span>, <span class="at">quote =</span> <span class="st">"</span><span class="sc">\"</span><span class="st">"</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>mofa_comparison_without <span class="ot">&lt;-</span> <span class="fu">read.table</span>(<span class="st">"~/R/Data/mofa_comparison.txt"</span>, <span class="at">header =</span> <span class="cn">TRUE</span>, <span class="at">sep =</span> <span class="st">" "</span>, <span class="at">quote =</span> <span class="st">"</span><span class="sc">\"</span><span class="st">"</span>, <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>all_min_parameters <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"rsme"</span>, <span class="st">"time_integration"</span>, <span class="st">"time_imputation"</span>)</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>all_max_parameters <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"mean_sil_score"</span>, <span class="st">"min_sil_score"</span>, <span class="st">"max_sil_score"</span>,  <span class="st">"knn_acc"</span>, <span class="st">"knn_acc_bal"</span> )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="cell">
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>stab_value_with_z <span class="ot">&lt;-</span> stab_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">knn_acc =</span> stab_knn_acc, <span class="at">knn_acc_bal =</span> stab_knn_acc_bal, <span class="at">rsme =</span> stab_rsme)<span class="sc">%&gt;%</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"ncomponentsReference: "</span>, ncomponentsReference, </span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| ncomponentsSubset: "</span>,       ncomponentsSubset, </span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| maxFeatures: "</span>,       maxFeatures, </span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| scale.center: "</span>,       scale.center, </span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| scale.scale: "</span>,       scale.scale, </span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| project_all: "</span>,       project_all )) <span class="sc">%&gt;%</span></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">pivot_longer</span>(</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>                          <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>time_imputation,</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>                          <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>                          <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))</span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>                        )) <span class="sc">%&gt;%</span></span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">filter</span>(normalized_value <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-19"><a href="#cb32-19" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">select</span>(value,metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-20"><a href="#cb32-20" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">stab_value_with_z =</span> value)</span>
+<span id="cb32-21"><a href="#cb32-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-22"><a href="#cb32-22" aria-hidden="true" tabindex="-1"></a>stab_value_without_z <span class="ot">&lt;-</span> stab_comparison_without <span class="sc">%&gt;%</span></span>
+<span id="cb32-23"><a href="#cb32-23" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">knn_acc =</span> stab_knn_acc, <span class="at">knn_acc_bal =</span> stab_knn_acc_bal, <span class="at">rsme =</span> stab_rsme)<span class="sc">%&gt;%</span></span>
+<span id="cb32-24"><a href="#cb32-24" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"ncomponentsReference: "</span>, ncomponentsReference, </span>
+<span id="cb32-25"><a href="#cb32-25" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| ncomponentsSubset: "</span>,       ncomponentsSubset, </span>
+<span id="cb32-26"><a href="#cb32-26" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| maxFeatures: "</span>,       maxFeatures, </span>
+<span id="cb32-27"><a href="#cb32-27" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| scale.center: "</span>,       scale.center, </span>
+<span id="cb32-28"><a href="#cb32-28" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| scale.scale: "</span>,       scale.scale, </span>
+<span id="cb32-29"><a href="#cb32-29" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| project_all: "</span>,       project_all )) <span class="sc">%&gt;%</span></span>
+<span id="cb32-30"><a href="#cb32-30" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">pivot_longer</span>(</span>
+<span id="cb32-31"><a href="#cb32-31" aria-hidden="true" tabindex="-1"></a>                          <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>time_imputation,</span>
+<span id="cb32-32"><a href="#cb32-32" aria-hidden="true" tabindex="-1"></a>                          <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb32-33"><a href="#cb32-33" aria-hidden="true" tabindex="-1"></a>                          <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-34"><a href="#cb32-34" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-35"><a href="#cb32-35" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb32-36"><a href="#cb32-36" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb32-37"><a href="#cb32-37" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))</span>
+<span id="cb32-38"><a href="#cb32-38" aria-hidden="true" tabindex="-1"></a>                        )) <span class="sc">%&gt;%</span></span>
+<span id="cb32-39"><a href="#cb32-39" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">filter</span>(normalized_value <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-40"><a href="#cb32-40" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">select</span>(value,metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-41"><a href="#cb32-41" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">stab_value_without_z =</span> value)</span>
+<span id="cb32-42"><a href="#cb32-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-43"><a href="#cb32-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-44"><a href="#cb32-44" aria-hidden="true" tabindex="-1"></a>mofa_value_with_z <span class="ot">&lt;-</span> mofa_comparison <span class="sc">%&gt;%</span></span>
+<span id="cb32-45"><a href="#cb32-45" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">knn_acc =</span> mofa_knn_acc, <span class="at">knn_acc_bal =</span> mofa_knn_acc_bal, <span class="at">rsme =</span> mofa_rsme, <span class="at">time_imputation =</span> imputation_time ) <span class="sc">%&gt;%</span></span>
+<span id="cb32-46"><a href="#cb32-46" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"num_factor"</span>, num_factor, </span>
+<span id="cb32-47"><a href="#cb32-47" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| scale_views: "</span>, scale_views, </span>
+<span id="cb32-48"><a href="#cb32-48" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| spikeslab_weights: "</span>, spikeslab_weights )) <span class="sc">%&gt;%</span></span>
+<span id="cb32-49"><a href="#cb32-49" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">pivot_longer</span>( <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>time_imputation,</span>
+<span id="cb32-50"><a href="#cb32-50" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb32-51"><a href="#cb32-51" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-52"><a href="#cb32-52" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-53"><a href="#cb32-53" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb32-54"><a href="#cb32-54" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb32-55"><a href="#cb32-55" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))))<span class="sc">%&gt;%</span></span>
+<span id="cb32-56"><a href="#cb32-56" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">filter</span>(normalized_value <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-57"><a href="#cb32-57" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">select</span>(value,metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-58"><a href="#cb32-58" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">mofa_value_with_z =</span> value)</span>
+<span id="cb32-59"><a href="#cb32-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-60"><a href="#cb32-60" aria-hidden="true" tabindex="-1"></a>mofa_value_without_z <span class="ot">&lt;-</span> mofa_comparison_without <span class="sc">%&gt;%</span></span>
+<span id="cb32-61"><a href="#cb32-61" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">knn_acc =</span> mofa_knn_acc, <span class="at">knn_acc_bal =</span> mofa_knn_acc_bal, <span class="at">rsme =</span> mofa_rsme, <span class="at">time_imputation =</span> imputation_time ) <span class="sc">%&gt;%</span></span>
+<span id="cb32-62"><a href="#cb32-62" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">parameters =</span> <span class="fu">paste</span>(<span class="st">"num_factor"</span>, num_factor, </span>
+<span id="cb32-63"><a href="#cb32-63" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| scale_views: "</span>, scale_views, </span>
+<span id="cb32-64"><a href="#cb32-64" aria-hidden="true" tabindex="-1"></a>                                                  <span class="st">"| spikeslab_weights: "</span>, spikeslab_weights )) <span class="sc">%&gt;%</span></span>
+<span id="cb32-65"><a href="#cb32-65" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">pivot_longer</span>( <span class="at">cols =</span> mean_sil_score<span class="sc">:</span>time_imputation,</span>
+<span id="cb32-66"><a href="#cb32-66" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">names_to =</span> <span class="st">"metric"</span>,</span>
+<span id="cb32-67"><a href="#cb32-67" aria-hidden="true" tabindex="-1"></a>                                      <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-68"><a href="#cb32-68" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">group_by</span>(metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-69"><a href="#cb32-69" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">mutate</span>(<span class="at">normalized_value =</span> <span class="fu">case_when</span>(</span>
+<span id="cb32-70"><a href="#cb32-70" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_max_parameters <span class="sc">~</span> (value <span class="sc">-</span> <span class="fu">min</span>(value)) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value)),</span>
+<span id="cb32-71"><a href="#cb32-71" aria-hidden="true" tabindex="-1"></a>                          metric <span class="sc">%in%</span> all_min_parameters <span class="sc">~</span> (<span class="fu">max</span>(value) <span class="sc">-</span> value) <span class="sc">/</span> (<span class="fu">max</span>(value) <span class="sc">-</span> <span class="fu">min</span>(value))))<span class="sc">%&gt;%</span></span>
+<span id="cb32-72"><a href="#cb32-72" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">filter</span>(normalized_value <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-73"><a href="#cb32-73" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">select</span>(value,metric) <span class="sc">%&gt;%</span></span>
+<span id="cb32-74"><a href="#cb32-74" aria-hidden="true" tabindex="-1"></a>                        <span class="fu">rename</span>(<span class="at">mofa_value_without_z =</span> value)</span>
+<span id="cb32-75"><a href="#cb32-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-76"><a href="#cb32-76" aria-hidden="true" tabindex="-1"></a>comp <span class="ot">&lt;-</span> <span class="fu">inner_join</span>(stab_value_with_z <span class="sc">%&gt;%</span> <span class="fu">inner_join</span>(stab_value_without_z), mofa_value_with_z <span class="sc">%&gt;%</span> <span class="fu">inner_join</span>(mofa_value_without_z)) <span class="sc">%&gt;%</span> <span class="fu">relocate</span>(metric, <span class="at">.before =</span> stab_value_with_z)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stderr">
+<pre><code>Joining with `by = join_by(metric)`
+Joining with `by = join_by(metric)`
+Joining with `by = join_by(metric)`</code></pre>
+</div>
+<details>
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(comp)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 18%">
+<col style="width: 22%">
+<col style="width: 18%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">metric</th>
+<th style="text-align: right;">stab_value_with_z</th>
+<th style="text-align: right;">stab_value_without_z</th>
+<th style="text-align: right;">mofa_value_with_z</th>
+<th style="text-align: right;">mofa_value_without_z</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">time_imputation</td>
+<td style="text-align: right;">47.5780000</td>
+<td style="text-align: right;">55.7770000</td>
+<td style="text-align: right;">0.1750000</td>
+<td style="text-align: right;">0.1700000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">max_sil_score</td>
+<td style="text-align: right;">0.9944412</td>
+<td style="text-align: right;">0.9931808</td>
+<td style="text-align: right;">0.9809117</td>
+<td style="text-align: right;">0.9847298</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">knn_acc</td>
+<td style="text-align: right;">0.9077138</td>
+<td style="text-align: right;">0.9031294</td>
+<td style="text-align: right;">0.9212677</td>
+<td style="text-align: right;">0.9101056</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">knn_acc</td>
+<td style="text-align: right;">0.9077138</td>
+<td style="text-align: right;">0.9031294</td>
+<td style="text-align: right;">0.9212677</td>
+<td style="text-align: right;">0.9101056</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">knn_acc_bal</td>
+<td style="text-align: right;">0.8794099</td>
+<td style="text-align: right;">0.8706110</td>
+<td style="text-align: right;">0.8865937</td>
+<td style="text-align: right;">0.8649511</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">mean_sil_score</td>
+<td style="text-align: right;">0.4947260</td>
+<td style="text-align: right;">0.4710323</td>
+<td style="text-align: right;">0.4655697</td>
+<td style="text-align: right;">0.4694649</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">rsme</td>
+<td style="text-align: right;">0.8495740</td>
+<td style="text-align: right;">1.1457196</td>
+<td style="text-align: right;">0.7832716</td>
+<td style="text-align: right;">0.8729886</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">min_sil_score</td>
+<td style="text-align: right;">-0.2050527</td>
+<td style="text-align: right;">-0.1500607</td>
+<td style="text-align: right;">-0.0846801</td>
+<td style="text-align: right;">-0.2326643</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">time_integration</td>
+<td style="text-align: right;">1.2280000</td>
+<td style="text-align: right;">1.4290000</td>
+<td style="text-align: right;">70.6000000</td>
+<td style="text-align: right;">93.3850000</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

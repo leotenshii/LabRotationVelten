@@ -27,6 +27,10 @@ library(MultiAssayExperiment)
 library(plotly)
 ```
 
+```{r}
+pathway_dataset <- "~/R/Data/data.RDS"
+```
+
 ## Preparing Data
 
 Load Data
@@ -41,37 +45,23 @@ Load Data
 # mae <- scMultiome("pbmc_10x", mode = "*", dry.run = FALSE, format = "MTX")
 
 # Loaded from RDS cause I cant install the SingleCellMultiModal package
-mae <- readRDS("~/R/Data/data.RDS")
+mae <- readRDS(pathway_dataset)
 metadata <- mae@colData
 ```
 
 Normalization
 
 ```{r}
-#---------------------------Data preperation------------------------------------
-# Normalization RNA
-sce.rna <- experiments(mae)[["rna"]]
-sce.rna <- logNormCounts(sce.rna)
-
-# Feature selection
-decomp <- modelGeneVar(sce.rna)
-hvgs <- rownames(decomp)[decomp$mean>0.01 & decomp$p.value <= 0.05]
-
-sce.rna <- sce.rna[hvgs,]
+#---------------------------Data preparation------------------------------------
+# RNA
+sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
 
-# Normalization ATAC
-sce.atac <- experiments(mae)[["atac"]]
-sce.atac <- logNormCounts(sce.atac)
-
-# Feature selection using highly variable peaks
-decomp <- modelGeneVar(sce.atac)
-hvgs <- rownames(decomp)[decomp$mean>0.25
-                         & decomp$p.value <= 0.05]
-
-sce.atac <- sce.atac[hvgs,]
+# ATAC
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
 
 logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
+
 ```
 
 ## Some general dataframes etc.
@@ -109,9 +99,12 @@ mosaicDataUpSet(assay_list)
 plot(mosaicDataTopology(assay_list))
 
 stab = stabMap(assay_list,
+               ncomponentsReference = 70,
+               ncomponentsSubset = 70,
                reference_list = c("Multiome"),
                plot = FALSE,
-               maxFeatures = 1100)
+               scale.center = FALSE,
+               scale.scale = FALSE)
 
 # UMAP
 stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
@@ -151,8 +144,8 @@ plot_data_overview(model)
 
 
 model_opts <- get_default_model_options(model)
-model_opts$num_factors <- 15
-model_opts$spikeslab_weights <- TRUE
+model_opts$num_factors <- 70
+#model_opts$spikeslab_weights <- TRUE
 MOFAobject <- prepare_mofa(model,
                            model_options = model_opts)
 
@@ -235,43 +228,17 @@ plasmacytoid DC have common ancestor with myeloid dc, their progenitor can also 
 ## Silhouette
 
 ```{r}
-#---------------------------Silhouette-------------------------------------------
-
 #StabMap celltype
-
-stab_sil <- silhouette(stab_umap$k, dist(stab_umap %>% select(V1, V2)))
-stab_sil_sum <- stab_sil %>% 
-  as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
-                                                      frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #average quality of clustering for the well-clustered data points within each cluster
-stab_sil_sum
+stab_sil_sum <- silhoutte_summary(stab_umap$k, stab_umap %>% select(V1, V2))
 
 #StabMap NA
-
-stab_sil_NA <- silhouette(stab_umap$isNA, dist(stab_umap %>% select(V1, V2)))
-stab_sil_sum_NA <- stab_sil_NA %>% 
-  as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
-                                                      frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
-stab_sil_sum_NA
+stab_sil_sum_NA <- silhoutte_summary(stab_umap$isNA, stab_umap %>% select(V1, V2))
 
 #MOFA celltype
-
-mofa_sil <- silhouette(mofa_umap$k, dist(mofa_umap %>% select(UMAP1, UMAP2)))
-mofa_sil_sum <- mofa_sil %>% 
-  as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
-                                                      frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) 
-mofa_sil_sum
+mofa_sil_sum <- silhoutte_summary(mofa_umap$k, mofa_umap %>% select(UMAP1, UMAP2))
 
 #MOFA NA 
-
-mofa_sil_NA <- silhouette(mofa_umap$isNA, dist(mofa_umap %>% select(UMAP1, UMAP2)))
-mofa_sil_sum_NA <- mofa_sil_NA %>% 
-  as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
-                                                      frac_pos = sum(sil_width > 0)/n(),
-                                                      pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) 
-mofa_sil_sum_NA
+mofa_sil_sum_NA <- silhoutte_summary(mofa_umap$isNA, mofa_umap %>% select(UMAP1, UMAP2))
 ```
 
 Zelltypen: Cluster 5 (effector CD8 T cells) für beide Methoden schlecht --\> -0.4243316 (MOFA). Überschneidet sich mit Kluster 3 (MAIT T cells), Kluster 8 (memory CD4 T cells) und 2 (CD56 (dim) NK cells)
@@ -295,7 +262,7 @@ Find the k-nearest neighbors in one data set for each point in another query dat
 
 uniformed_fixed =\> One fixed k for all
 
-The balanced eresult is first mean for celltype, then mean over all celltypes. Unbalanced one is just the mean over all cells
+The balanced result is first mean for celltype, then mean over all celltypes. Unbalanced one is just the mean over all cells
 
 ```{r}
 source("adaptiveKNN.R")
@@ -419,7 +386,8 @@ stab_baseline_comp %>%
   mutate(diff = (predicted - baseline)) %>%
   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
     ggplot() +
-  geom_col(aes(x = sample, y = diff, fill = celltype)) 
+  geom_col(aes(x = sample, y = diff, fill = celltype)) +
+  ggtitle("StabMap")
 
 
 
@@ -429,7 +397,8 @@ mofa_baseline_comp %>%
   mutate(diff = (predicted - baseline)) %>%
   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
     ggplot() +
-  geom_col(aes(x = sample, y = diff, fill = celltype)) 
+  geom_col(aes(x = sample, y = diff, fill = celltype)) +
+  ggtitle("MOFA")
 
 
 # Comparing with the diff of the actual and predicted values

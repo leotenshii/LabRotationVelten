@@ -35,34 +35,15 @@ metadata <- mae@colData
 
 
 
-#---------------------------Data preperation------------------------------------
-# Normalization RNA
-sce.rna <- experiments(mae)[["rna"]]
-sce.rna <- logNormCounts(sce.rna)
-
-# Feature selection
-decomp <- modelGeneVar(sce.rna)
-hvgs <- rownames(decomp)[decomp$mean>0.01 & decomp$p.value <= 0.05]
-
-sce.rna <- sce.rna[hvgs,]
-sce.rna <- scale(sce.rna@assays@data@listData$logcounts)
+#---------------------------Data preparation------------------------------------
+# RNA
+sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
 
-# Normalization ATAC
-sce.atac <- experiments(mae)[["atac"]]
-sce.atac <- logNormCounts(sce.atac)
+# ATAC
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
 
-# Feature selection using highly variable peaks
-decomp <- modelGeneVar(sce.atac)
-hvgs <- rownames(decomp)[decomp$mean>0.25
-                         & decomp$p.value <= 0.05]
-
-sce.atac <- sce.atac[hvgs,]
-sce.atac <- scale(sce.atac@assays@data@listData$logcounts)
-
-#logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
-logcounts_all <- rbind(sce.rna, sce.atac)
-
+logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
 
 ## Some general dataframes etc.
 
@@ -94,12 +75,12 @@ assay_list = list(
 
 #---------------------------Parameters------------------------------------------
 param_grid <- expand.grid(
-  ncomponentsReference = c( 15, 30, 40, 50, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
-  ncomponentsSubset = c( 15, 30, 40, 50, 70),
-  maxFeatures = c(1000, 1740, 2700), # Too many maybe overfitting
-  scale.center = c(TRUE, FALSE), # False when mean or variance carry some important information?
-  scale.scale = c(TRUE, FALSE),
-  project_all = c(TRUE, FALSE) # might help in refining the alignment
+  ncomponentsReference = c( 10, 15, 20, 30, 40, 50, 60, 70), # More ncomponents can capture more variance but may include noise. -> Should be similar?
+  # ncomponentsSubset = c( 15, 30, 40, 50, 70),
+  maxFeatures = c(1000), # Too many maybe overfitting
+  scale.center = c( FALSE), # False when mean or variance carry some important information?
+  scale.scale = c( FALSE),
+  project_all = c(FALSE) # might help in refining the alignment
 )
 
 
@@ -112,6 +93,8 @@ results <- list()
 #---------------------------Loop------------------------------------------------
 for (i in 1:nrow(param_grid)) {
   params <- param_grid[i, ]
+  
+  params$ncomponentsSubset <- params$ncomponentsReference
   
   # Print current parameters 
   cat("Running stabMap with ncomponentsReference =", params$ncomponentsReference,
@@ -144,11 +127,8 @@ time_integration <- system.time(  stab <- stabMap(
     column_to_rownames("Row.names")
   
   # Calculate silhouette scores
-  stab_sil <- silhouette(stab_umap$k, dist(stab_umap %>% select(V1, V2)))
-  stab_sil_sum <- stab_sil %>%
-    as.data.frame() %>%
-    group_by(cluster) %>%
-    summarise(score = mean(sil_width), frac_pos = sum(sil_width > 0) / n(), pos_score = sum((sil_width > 0) * sil_width) / sum(sil_width > 0))
+  stab_sil_sum <- silhoutte_summary(stab_umap$k, stab_umap %>% select(V1, V2))
+  
   
   # Calculate clustering stats
   stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k, silhouette = FALSE)
@@ -276,4 +256,4 @@ for (param_name in names(results)) {
 
 print(comparison)
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_with_z.txt")
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_numfactors.txt")

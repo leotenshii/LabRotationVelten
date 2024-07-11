@@ -26,40 +26,21 @@ source("/home/hd/hd_hd/hd_fb235/R/Scripts/adaptiveKNN.R")
 mae <- readRDS("/home/hd/hd_hd/hd_fb235/R/Data/data.RDS")
 metadata <- mae@colData
 
-#---------------------------Data preperation------------------------------------
-# Normalization RNA
-sce.rna <- experiments(mae)[["rna"]]
-sce.rna <- logNormCounts(sce.rna)
-
-# Feature selection
-decomp <- modelGeneVar(sce.rna)
-hvgs <- rownames(decomp)[decomp$mean>0.01 & decomp$p.value <= 0.05]
-
-sce.rna <- sce.rna[hvgs,]
-# V2
-sce.rna.scaled <- scale(sce.rna@assays@data@listData$logcounts)
+#---------------------------Data preparation------------------------------------
+# RNA
+sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
 
-# Normalization ATAC
-sce.atac <- experiments(mae)[["atac"]]
-sce.atac <- logNormCounts(sce.atac)
-
-# Feature selection using highly variable peaks
-decomp <- modelGeneVar(sce.atac)
-hvgs <- rownames(decomp)[decomp$mean>0.25
-                         & decomp$p.value <= 0.05]
-
-sce.atac <- sce.atac[hvgs,]
-#V2
-sce.atac.scaled <- scale(sce.atac@assays@data@listData$logcounts)
+# ATAC
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
 
 logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
-logcounts_all_matrix <- rbind(sce.rna.scaled, sce.atac.scaled)
+
 
 #---------------------------General Data----------------------------------------
 
 # Celltypes of all samples
-all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all))) %>%
+all_celltypes <- as.data.frame( setNames(metadata$celltype, colnames(logcounts_all))) %>%
   rename( celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
 
 # Clusters as numbers
@@ -68,10 +49,10 @@ cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n())
 #---------------------------MOFA------------------------------------------------
 
 # Put NAs in data, takes a long time
-logcounts_allNA <- logcounts_all_matrix
-logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
+# logcounts_allNA <- logcounts_all
+# logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
 
-#logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
+logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
 
 # Create list for MOFA
 mofa_list <- list(
@@ -96,10 +77,10 @@ model_opts <- get_default_model_options(model)
 
 
 param_grid <- expand.grid(
-  scale_views = c(TRUE,FALSE),
+  scale_views = c(FALSE),
   num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
   # spikeslab_factors = c(TRUE, FALSE),
-  spikeslab_weights = c(TRUE,FALSE)
+  spikeslab_weights = c(FALSE)
   # ard_factors = c(TRUE,FALSE), # gruppen ebene
   # ard_weights = c(TRUE,FALSE)
 )
@@ -163,6 +144,7 @@ for (i in 1:nrow(param_grid)) {
                              data_options = data_opts,
                              model_options = model_opts)
   
+  set.seed(42)
   time_integration_all <- system.time(trained_model <- run_mofa(MOFAobject, use_basilisk = TRUE))
   
   # UMAP
@@ -176,11 +158,7 @@ for (i in 1:nrow(param_grid)) {
     select(-sample)
   
   # Silhouette scores
-  mofa_sil <- silhouette(mofa_umap$k, dist(mofa_umap %>% select(UMAP1, UMAP2)))
-  mofa_sil_sum <- mofa_sil %>% 
-    as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
-                                                        frac_pos = sum(sil_width > 0)/n(),
-                                                        pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0))
+  mofa_sil_sum <- silhoutte_summary(mofa_umap$k, mofa_umap %>% select(UMAP1, UMAP2))
   
   # Clustering stats
   mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
@@ -205,7 +183,7 @@ for (i in 1:nrow(param_grid)) {
   mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
     rownames_to_column("feature") %>%
     pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-    full_join(as.data.frame(as.matrix(logcounts_all_matrix[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
+    full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
                 rownames_to_column("feature") %>%
                 pivot_longer(-feature, names_to = "sample", values_to = "actual"))
   
@@ -314,7 +292,7 @@ print(comparison)
 
 
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_z_norm.txt")
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_numfactors.txt")
 
 
 

@@ -1,0 +1,678 @@
+---
+title: "Comparison Parameters"
+author: "Leoni Zimmermann"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+    toc: true
+editor: visual
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+suppressMessages(c(library(tidyverse),
+                   library(plotly),
+                   library(patchwork),
+                   library(knitr)))
+```
+
+# Summary
+
+This lab rotation project compares two methods for multi-omics data integration and imputation: MOFA (Multi-Omics Factor Analysis) and StabMap. I evaluate their performance on various metrics. I focus on silhouette scores and cell type classification accuracy for integration, and root mean square error (RMSE) for imputation. The first part of the analysis explores which parameters are best suited for integration and imputation, respectively. The effect of different bridge sizes (overlap of features between the datasets) is discussed in the second part.
+
+<!-- Conclusion -->
+
+# First part: parameter selection
+
+## Functions
+
+Custom functions for improved readability
+
+```{r, message=FALSE, warning=FALSE, code-fold=TRUE}
+mofa_plot_metric_for_diff_factors <- function(data, parameter, metric, col = NA, ...) {
+  p <- data %>% 
+    group_by({{parameter}}) %>% 
+    mutate(mean = mean({{metric}})) %>%
+    ggplot() + 
+      geom_point(aes(x = {{parameter}}, y = mean), col = "red") +
+      geom_line(aes(x = {{parameter}}, y = mean, group = 1), col = "red") +
+      theme_classic() +
+      labs(...)
+
+  if (length(col) > 1) {
+    p <- p + geom_point(aes(x = {{parameter}}, y = {{metric}}, col = {{col}}), alpha = 0.25)
+    p <- p + guides(col = guide_legend(title = gsub(".*\\$", "", deparse(substitute(col)))))
+  } else {
+    p <- p + geom_point(aes(x = {{parameter}}, y = {{metric}}), alpha = 0.25, col = "gray")
+  }
+  return(p)
+}
+
+stab_plot_metric_for_diff_factors <- function(data, metric, col = NA, ...) {
+  p <- data %>% 
+    group_by(ncomponentsReference, ncomponentsSubset) %>% 
+    mutate(mean = mean({{metric}})) %>%
+    ggplot() + 
+      geom_point(aes(x = ncomponentsReference, y = mean), col = "red") +
+      geom_line(aes(x = ncomponentsReference, y = mean, group = 1), col = "red") +
+      facet_grid(cols = vars(ncomponentsSubset)) +
+      theme_classic() +
+      labs(...)
+  if (length(col) > 1) {
+    p <- p + geom_point(aes(x = ncomponentsReference, y = {{metric}}, col = {{col}}), alpha = 0.25)
+    p <- p + guides(col = guide_legend(title = gsub(".*\\$", "", deparse(substitute(col)))))
+  } else {
+    p <- p + geom_point(aes(x = ncomponentsReference, y = {{metric}}), alpha = 0.25, col = "gray")
+  }
+  return(p)
+}
+
+plot_metric_trend <- function(data, x, y) {
+  ggplot(data, aes(x = {{x}}, y = {{y}})) +
+  geom_point() +
+  geom_line(group = 1) +
+  theme_classic()
+} 
+
+compare_methods <- function(mofa_data, mofa_param, mofa_metric, stab_data, stab_param, stab_metric, ...) {
+  ggplot() +
+    geom_point(data = mofa_data,aes( x = {{mofa_param}}, y = {{mofa_metric}}, col = "MOFA")) + 
+    geom_line(data = mofa_data,aes(x = {{mofa_param}}, y = {{mofa_metric}}, group = 1, col = "MOFA")) +
+    geom_point(data = stab_data,aes(x = {{stab_param}}, y = {{stab_metric}}, col = "StabMap")) +
+    geom_line(data = stab_data,aes(x = {{stab_param}}, y ={{stab_metric}}, group = 1, col = "StabMap")) +
+    labs(...) + 
+    theme_classic()
+}
+
+stability_rand_NAcells <- function(data, mofa_metric, mofa_sd, stab_metric, stab_sd, ...) {
+  ggplot(data) +
+    geom_col(aes(x = 1, y = {{mofa_metric}}, fill = "MOFA"), width = 0.2) +
+    geom_errorbar(aes(x = 1, ymin = {{mofa_metric}} - {{mofa_sd}}, ymax = {{mofa_metric}} + {{mofa_sd}}), width = 0.05) +
+    geom_col(aes(x = 1.25, y = {{stab_metric}}, fill = "StabMap"), width = 0.2) +
+    geom_errorbar(aes(x = 1.25, ymin = {{stab_metric}} - {{stab_sd}}, ymax = {{stab_metric}} + {{stab_sd}}), width = 0.05) +
+    theme_classic() +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+    labs(x = "", fill = "Tool", ...) 
+} 
+
+```
+
+## Data
+
+```{r}
+# MOFA
+mofa_param_comparison <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE) %>%
+  select(-mofa_mae)
+
+mofa_comparison_set_param  <- read.table("~/R/Data/mofa_comparison_numfactors.txt", header = TRUE)
+
+mofa_rand_NAcells_70 <- read.table("~/R/Data/mofa_random_cells_NA_70.txt", header = TRUE)
+mofa_rand_NAcells <- read.table("~/R/Data/mofa_random_cells_NA_15.txt", header = TRUE) %>%
+  select(-mofa_rmse) %>%
+  cbind(mofa_rand_NAcells_70$mofa_rmse)
+
+
+# StabMap
+stab_param_comparison <- read.table("~/R/Data/stab_comparison.txt", header = TRUE)%>%
+  select(-stab_mae)
+
+stab_comparison_set_param  <- read.table("~/R/Data/stab_comparison_numfactors.txt") %>%
+  mutate(num_pc = ncomponentsReference)
+
+stab_rand_NAcells <- read.table("~/R/Data/stab_random_cells_NA.txt", header = TRUE) 
+```
+
+## Finding the parameters maximizing selected metrics
+
+### Number of factors/PC
+
+Integration and imputation were performed with various combinations of different parameter ranges. The plots illustrate the trend of the three selected metrics for varying numbers of factors/principal components (PC). The metric was averaged over all runs with the same number of factors/PCs. The gray dots represent the individual values.
+
+```{r}
+# MOFA
+print(mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mean_sil_score, col = mofa_param_comparison$scale_views, 
+                                        title = "Mean silhouette score for different number of factors", x = "Number of factors", y = "Mean silhouette score") +
+      mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mofa_knn_acc_bal, 
+                                        title = "Mean mofa_knn_acc_bal for different number of factors", x = "Number of factors", y = "Mean mofa_knn_acc_bal") +  
+      mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mofa_rmse, 
+                                        title = "Mean RMSE for different number of factors", x = "Number of factors", y = "Mean RMSE") +
+      plot_annotation(title = 'Influence of different number of factors for integration and imputation with MOFA'))
+
+# StabMap
+print(stab_plot_metric_for_diff_factors(stab_param_comparison, mean_sil_score, col = stab_param_comparison$scale.scale, 
+                                        title = "Mean silhouette score for different number of components", x = "Number of reference components", y = "Mean silhouette score") +
+      stab_plot_metric_for_diff_factors(stab_param_comparison, stab_knn_acc_bal, 
+                                        title = "Mean mofa_knn_acc_bal for different number of components", x = "Number of reference components", y = "Mean stab_knn_acc_bal") +
+      stab_plot_metric_for_diff_factors(stab_param_comparison, stab_rmse, 
+                                        title = "Mean RMSE for different number of components", x = "Number of reference components", y = "Mean RMSE") +
+      plot_annotation(title = 'Influence of different number of components for integration and imputation with StabMap'))
+```
+
+I observed that fewer factors resulted in improved integration outcomes for MOFA, with 15 factors demonstrating the most optimal performance. Conversely, for StabMap, I identify a higher number of PC as the optimal parameter. Imputation exhibited the most favorable outcomes for both methods with the highest number of tested factors/PC.
+
+### Other parameters
+
+To assess the effect of the other parameters, I repeat the same plot for all possible metrics. (The HTML output is disabled since it comprises a considerable number of plots.)
+
+```{r, output = FALSE}
+# MOFA
+for (j in 1:3) {
+  par_name <- rlang::sym(colnames(mofa_param_comparison)[j])
+  for (i in 1:9) {
+    var_name <- rlang::sym(colnames(mofa_param_comparison)[3+i])
+    print(mofa_plot_metric_for_diff_factors(mofa_param_comparison, !!par_name, !!var_name, 
+                                            title = paste("Mean", var_name, "for different number of components"), x = par_name, y = paste("Mean", var_name)))
+  }
+}
+
+
+# StabMap
+for (j in 1:6) {
+  par_name <- rlang::sym(colnames(stab_param_comparison)[j])
+  for (i in 1:8) {
+    var_name <- rlang::sym(colnames(stab_param_comparison)[6+i])
+    print(mofa_plot_metric_for_diff_factors(stab_param_comparison, !!par_name, !!var_name, 
+                                            title = paste("Mean", var_name, "for different number of components"), x = par_name, y = paste("Mean", var_name)))
+  }
+}
+```
+
+Results for MOFA:
+
+| Parameter         | Integration                       | Imputation                                        | Optimal setting |
+|----------------|----------------|------------------------|----------------|
+| scale_views       | Slightly better when FALSE               | Slightly better when TRUE, but insignificant difference  | FALSE           |
+| spikeslab_weights | Mixed results, overall better when FALSE | Slightly better when FALSE, but insignificant difference | FALSE           |
+
+Results for StabMap:
+
+| Parameter    | Integration       | Imputation        | Optimal setting                                                        |
+|---------------|---------------|---------------|---------------------------|
+| PC Subset    | Insignificant difference | Insignificant difference | Same number as PC reference (since both have the same amount of cells) |
+| maxFeatures  | <!--# Maybe rerun -->    |                          | <!--# Maybe all? Didnt test it for MOFA -->                            |
+| scale.center | Better when TRUE         | Better when TRUE         | FALSE                                                                  |
+| scale.scale  | Better when FALSE        | Better when FALSE        | FALSE                                                                  |
+| project_all  | Better when TRUE         | Better when FALSE        | FALSE                                                                  |
+
+I set all scaling parameters to FALSE to keep both methods comparable.
+
+Another way to visualize:\
+
+```{r}
+# MOFA
+metrics <- c("mean_sil_score", "mofa_rmse")
+
+for (j in 1:2) {
+  metric <- metrics[j]
+  for (i in c(1,3)) {
+    var_name <- colnames(mofa_param_comparison)[i]
+    
+    plot_data <- mofa_param_comparison %>%
+      group_by(num_factor, !!sym(var_name)) %>%
+      summarize(mean = mean(!!sym(metric)), .groups = 'drop')
+    
+    p <- ggplot(plot_data) +
+      geom_point(aes(x = num_factor, 
+                     y = mean, 
+                     col = as.factor(!!sym(var_name)))) +
+      geom_line(aes(x = num_factor, 
+                    y = mean, 
+                    group = !!sym(var_name), 
+                    col = as.factor(!!sym(var_name)))) +
+      theme_classic() +
+      ggtitle(paste("Plot for parameter:", var_name, "- Metric:", metric)) +
+      ylab(paste("Mean", metric)) +
+      scale_color_discrete(name = var_name)
+    
+    print(p)
+  }
+}
+
+# StabMap
+metrics <- c("mean_sil_score", "stab_rmse")
+
+for (j in 1:2) {
+  metric <- metrics[j]
+  for (i in 1:5) {
+    var_name <- colnames(stab_param_comparison)[1 + i]
+    
+    plot_data <- stab_param_comparison %>%
+      group_by(ncomponentsReference, !!sym(var_name)) %>%
+      summarize(mean = mean(!!sym(metric)), .groups = 'drop')
+    
+    p <- ggplot(plot_data) +
+      geom_point(aes(x = ncomponentsReference, 
+                     y = mean, 
+                     col = as.factor(!!sym(var_name)))) +
+      geom_line(aes(x = ncomponentsReference, 
+                    y = mean, 
+                    group = !!sym(var_name), 
+                    col = as.factor(!!sym(var_name)))) +
+      theme_classic() +
+      ggtitle(paste("Plot for parameter:", var_name, "- Metric:", metric)) +
+      ylab(paste("Mean", metric)) +
+      scale_color_discrete(name = var_name)
+    
+    print(p)
+  }
+}
+```
+
+## Comparison with best results per metric
+
+In this section, I present a comparison of the metric results obtained from the runs with the parameter setting I have previously described and the best metric results from all possible parameter combinations.
+
+```{r}
+mofa_table <- mofa_param_comparison %>%
+  filter(scale_views == FALSE, spikeslab_weights == FALSE, num_factor %in% c(15, 70))
+  
+mofa_table_2 <- data.frame(
+      metric = c("mean_sil_score", "mofa_knn_acc_bal", "mofa_rmse"),
+      values_selected_parameters = c(
+        mofa_table$mean_sil_score[1],
+        mofa_table$mofa_knn_acc_bal[1],
+        mofa_table$mofa_rmse[2]),
+      max_value = c(
+        max(mofa_param_comparison$mean_sil_score),
+        max(mofa_param_comparison$mofa_knn_acc_bal),
+        min(mofa_param_comparison$mofa_rmse))) %>%
+      mutate(diff = max_value - values_selected_parameters )
+
+mofa_table_2
+```
+
+```{r}
+stab_table <- stab_param_comparison %>%
+  filter(scale.scale == FALSE, scale.center == FALSE, ncomponentsReference == 70, ncomponentsSubset == 70, project_all == FALSE, maxFeatures == 1000) 
+
+stab_table_2 <- data.frame(
+    metric = c("mean_sil_score", "stab_knn_acc_bal", "stab_rmse"),
+    values_selected_parameters = c(
+      stab_table$mean_sil_score,
+      stab_table$stab_knn_acc_bal,
+      stab_table$stab_rmse),
+    max_value = c(
+      max(stab_param_comparison$mean_sil_score),
+      max(stab_param_comparison$stab_knn_acc_bal),
+      min(stab_param_comparison$stab_rmse))) %>%
+    mutate(diff = max_value - values_selected_parameters )
+
+stab_table_2
+```
+
+The difference between the maximum value and the values obtained with the two methods is minimal for all metrics.\
+
+Here I compare the metric values, calculated with the above chosen parameters, of both tools against each other
+
+```{r}
+tibble(
+  metric = c("mean_sil_score", "knn_acc_bal", "RMSE"),
+  MOFA = mofa_table_2$values_selected_parameters,
+  StabMap = stab_table_2$values_selected_parameters
+)
+```
+
+MOFA has better results for all three metrics.
+
+## Metrics for different num of factors with set parameters
+
+Here I visualize how the number of factors/PC affects the results as the only varying parameter.
+
+```{r}
+# MOFA
+plot_metric_trend(mofa_comparison_set_param , num_factor, mofa_rmse)
+plot_metric_trend(mofa_comparison_set_param , num_factor, mean_sil_score)
+plot_metric_trend(mofa_comparison_set_param , num_factor, mofa_knn_acc_bal)
+
+# StabMap
+plot_metric_trend(stab_comparison_set_param , num_pc, stab_rmse)
+plot_metric_trend(stab_comparison_set_param , num_pc, mean_sil_score)
+plot_metric_trend(stab_comparison_set_param , num_pc, stab_knn_acc_bal)
+```
+This verifies that the optimal number of factors for integration is 15 (20 would be another option), and 70 for imputation. However, the RMSE does not exhibit a notable reduction when the number of factors exceeds 30. For StabMap 70 PCs for both the reference and query are optimal.
+
+The following figures depict a comparison of the metric trends between MOFA and StabMap:
+```{r}
+compare_methods(mofa_comparison_set_param , mofa_comparison_set_param $num_factor, mofa_comparison_set_param $mean_sil_score, 
+                stab_comparison_set_param , stab_comparison_set_param $num_pc, stab_comparison_set_param $mean_sil_score,
+                x = "Number factors/PC", y = "Mean silhouette score")
+
+compare_methods(mofa_comparison_set_param , mofa_comparison_set_param $num_factor, mofa_comparison_set_param $mofa_knn_acc_bal, 
+                stab_comparison_set_param , stab_comparison_set_param $num_pc, stab_comparison_set_param $stab_knn_acc_bal,
+                x = "Number factors/PC", y = "Celltype accuracy")
+
+compare_methods(mofa_comparison_set_param , mofa_comparison_set_param $num_factor, mofa_comparison_set_param $mofa_rmse, 
+                stab_comparison_set_param , stab_comparison_set_param $num_pc, stab_comparison_set_param $stab_rmse,
+                x = "Number factors/PC", y = "RMSE")
+```
+
+
+## Random NA cells
+
+To assess the stability of the results, I repeated integration and imputation five times with different cells having ATAC values missing.
+(To not be confused: for MOFA 15 factors were used for integration metrics and 70 factors for imputation)
+```{r}
+random_NA_both <- cbind(
+                    stab_rand_NAcells %>%
+                    summarize(
+                      stab_mean_sil_score_mean = mean(mean_sil_score), 
+                      stab_mean_sil_score_sd = sd(mean_sil_score),
+                      stab_knn_acc_bal_mean = mean(stab_knn_acc_bal), 
+                      stab_knn_acc_bal_sd = sd(stab_knn_acc_bal), 
+                      stab_rmse_mean = mean(stab_rmse), 
+                      stab_rmse_sd = sd(stab_rmse)
+                    ) ,
+                    mofa_rand_NAcells %>%
+                    summarize(
+                      mofa_mean_sil_score_mean = mean(mean_sil_score), 
+                      mofa_mean_sil_score_sd = sd(mean_sil_score),
+                      mofa_knn_acc_bal_mean = mean(mofa_knn_acc_bal), 
+                      mofa_knn_acc_bal_sd = sd(mofa_knn_acc_bal), 
+                      mofa_rmse_mean = mean(mofa_rand_NAcells_70$mofa_rmse), 
+                      mofa_rmse_sd = sd(mofa_rand_NAcells_70$mofa_rmse)
+                    ) 
+                  )
+```
+
+```{r}
+stability_rand_NAcells(random_NA_both, 
+                  mofa_metric = mofa_mean_sil_score_mean,
+                  mofa_sd = mofa_mean_sil_score_sd,
+                  stab_metric = stab_mean_sil_score_mean,
+                  stab_sd = stab_mean_sil_score_sd, 
+                  y = "Mean silhouette width")
+
+stability_rand_NAcells(random_NA_both, 
+                  mofa_metric = mofa_knn_acc_bal_mean,
+                  mofa_sd = mofa_knn_acc_bal_sd,
+                  stab_metric = stab_knn_acc_bal_mean,
+                  stab_sd = stab_knn_acc_bal_sd, 
+                  y = "Mean Celltype Accuracy")
+
+stability_rand_NAcells(random_NA_both, 
+                  mofa_metric = mofa_rmse_mean,
+                  mofa_sd = mofa_rmse_sd,
+                  stab_metric = stab_rmse_mean,
+                  stab_sd = stab_rmse_sd, 
+                  y = "Mean RMSE")
+```
+The goodness of the results does not depend on what cells are missing the ATAC features. 
+
+# Second part: different bridge sizes
+
+The bridge are the features that are common to both datasets. Therefore the bridge size is the the number of featueres shared. Here I test how well integration and imputation work with reduced bridge sizes.
+
+## Functions
+
+```{r}
+plot_bridge_sizes <- function(data, knn_acc_bal, rmse, rmse_rna, rmse_atac) {
+  plot1 <- ggplot(data) +
+    geom_point(aes(x = bridge_size, y = mean_sil_score)) +
+    geom_line(aes(x = bridge_size, y = mean_sil_score, group = 1)) +
+    theme_classic() +
+    labs(x = "Bridge size", y = "Mean silhouette score", title = "Influence of different bridge sizes on the mean silhouette score")
+  
+  plot2 <- ggplot(data) +
+    geom_point(aes(x = bridge_size, y = {{knn_acc_bal}})) +
+    geom_line(aes(x = bridge_size, y = {{knn_acc_bal}}, group = 1)) +
+    theme_classic() +
+    labs(x = "Bridge size", y = "Celltype accuracy", title = "Influence of different bridge sizes on the Celltype accuracy")
+  
+  plot3 <- ggplot(data) +
+    geom_point(aes(x = bridge_size, y = {{rmse}})) +
+    geom_line(aes(x = bridge_size, y = {{rmse}}, group = 1)) +
+    theme_classic() +
+    labs(x = "Bridge size", y = "RMSE", title = "Influence of different bridge sizes on the RMSE")
+  
+  plot4 <- ggplot(data) +
+    geom_point( aes(x = bridge_size, y = {{rmse}})) +
+    geom_line( aes(x = bridge_size, y = {{rmse}}, group = 1)) +
+    geom_point( aes(x = bridge_size, y = {{rmse_rna}}, col = "RNA")) +
+    geom_point( aes(x = bridge_size, y = {{rmse_atac}}, col = "ATAC")) +
+    theme_classic() +
+    labs(x = "Bridge size", y = "RMSE", title = "Influence of different bridge sizes on the RMSE (with RNA and ATAC seperated)")
+
+  # Return a list of all plots
+  return(list(sil_score = plot1, celltype_accuracy = plot2, rmse = plot3, rmse__rna_atac_sep = plot4))
+}
+```
+
+
+## Data
+
+```{r}
+mofa_bridge_70 <- read.table("~/R/Data/mofa_bridge_70_2.txt", header = TRUE)
+mofa_bridge_15 <- read.table("~/R/Data/mofa_bridge_15_2.txt", header = TRUE)
+stab_bridge <- read.table("~/R/Data/stab_bridge_2.txt", header = TRUE)
+```
+
+
+
+
+```{r}
+# mofa_bridge <- read.table("~/R/Data/mofa_bridge.txt", header = TRUE)
+mofa_bridge_ATAC <- read.table("~/R/Data/mofa_bridge_70_ATACNA.txt", header = TRUE)
+mofa_bridge_sep <- read.table("~/R/Data/mofa_bridge_70_sep.txt", header = TRUE)
+```
+
+
+
+```{r}
+plot_bridge_sizes(data = mofa_bridge_70, 
+                  knn_acc_bal = knn_acc_bal, 
+                  rmse = rmse,  
+                  rmse_rna = rmse_rna, 
+                  rmse_atac = rmse_atac)
+
+plot_bridge_sizes(data = mofa_bridge_15,
+                  knn_acc_bal = knn_acc_bal,
+                  rmse = rmse,
+                  rmse_rna = rmse_rna,
+                  rmse_atac = rmse_atac)
+
+plot_bridge_sizes(data = stab_bridge, 
+                  knn_acc_bal = knn_acc_bal, 
+                  rmse = rmse,  
+                  rmse_rna = rmse_rna, 
+                  rmse_atac = rmse_atac)
+```
+
+```{r}
+# stab_bridge <- read.table("~/R/Data/stab_bridge.txt", header = TRUE)
+
+stab_bridge_ATAC <- read.table("~/R/Data/stab_bridge_ATACNA.txt", header = TRUE)
+stab_bridge_sep <- read.table("~/R/Data/stab_bridge_sep.txt", header = TRUE)
+```
+
+```{r}
+plot_bridge_sizes(data = stab_bridge_ATAC, 
+                  knn_acc_bal = stab_knn_acc_bal, 
+                  rmse = stab_rmse, 
+                  sep_rmse_data = stab_bridge_sep, 
+                  rmse_rna = stab_rmse_rna, 
+                  rmse_atac = stab_rmse_atac)
+
+plot_bridge_sizes(data = mofa_bridge, 
+                  knn_acc_bal = knn_acc_bal, 
+                  rmse = rmse, 
+                  sep_rmse_data = NULL, 
+                  rmse_rna = NULL, 
+                  rmse_atac = NULL)
+```
+
+```{r}
+
+compare_methods (mofa_bridge_ATAC, bridge_size, mean_sil_score, 
+                stab_bridge_ATAC, bridge_size, mean_sil_score,
+                x = "Bridge size", y = "Mean silhouette score")
+
+compare_methods (mofa_bridge_ATAC, bridge_size, mofa_knn_acc_bal, 
+                stab_bridge_ATAC, bridge_size, stab_knn_acc_bal,
+                x = "Bridge size", y = "Celltype accuracy")
+
+compare_methods (mofa_bridge_ATAC, bridge_size, mofa_rmse, 
+                stab_bridge_ATAC, bridge_size, stab_rmse,
+                x = "Bridge size", y = "RMSE")
+  
+```
+
+#Let it run so i dont need the 1704- !!!
+
+## RNA NA firsst
+
+```{r}
+mofa_bridge_RNA <- read.table("~/R/Data/mofa_bridge_70_RNANA.txt", header = TRUE)
+```
+
+```{r}
+ggplot(mofa_bridge_RNA) +
+  geom_point(aes(x = 1740-bridge_size, y = mean_sil_score)) +
+  geom_line(aes(x = 1740-bridge_size, y = mean_sil_score, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+  
+ggplot(mofa_bridge_RNA) +
+  geom_point(aes(x = 1740-bridge_size, y = mofa_knn_acc_bal)) +
+  geom_line(aes(x = 1740-bridge_size, y = mofa_knn_acc_bal, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+
+ggplot(mofa_bridge_RNA) +
+  geom_point(aes(x = 1740-bridge_size, y = mofa_rmse)) +
+  geom_line(aes(x = 1740-bridge_size, y = mofa_rmse, group = 1)) +
+  geom_vline(xintercept = 952) + 
+  scale_x_continuous(breaks = c(seq(0, 2000, by = 500), 116, 952)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  +
+  xlab("bridge_size")
+```
+
+```{r}
+stab_bridge_RNA <- read.table("~/R/Data/stab_bridge_RNANA.txt", header = TRUE)
+```
+
+```{r}
+ggplot(stab_bridge_RNA) +
+  geom_point(aes(x = 1740-bridge_size, y = mean_sil_score)) +
+  geom_line(aes(x = 1740-bridge_size, y = mean_sil_score, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+  
+ggplot(stab_bridge_RNA) +
+  geom_point(aes(x = 1740-bridge_size, y = stab_knn_acc_bal)) +
+  geom_line(aes(x = 1740-bridge_size, y = stab_knn_acc_bal, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+
+ggplot(stab_bridge_RNA) +
+  geom_point(aes(x = 1740-bridge_size, y = stab_rmse)) +
+  geom_line(aes(x = 1740-bridge_size, y = stab_rmse, group = 1)) +
+  geom_vline(xintercept = 952) + 
+  scale_x_continuous(breaks = c(seq(0, 2000, by = 500), 116, 952)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  +
+  xlab("bridge_size")
+```
+
+```{r}
+ggplot() +
+  geom_point(data = stab_bridge_RNA, aes(x = 1740 - bridge_size, y = mean_sil_score, col = "StabMap")) +
+  geom_line(data =stab_bridge_RNA, aes(x = 1740 - bridge_size, y = mean_sil_score, group = 1, col = "StabMap")) +
+  geom_point(data =mofa_bridge_RNA, aes(x = 1740 - bridge_size, y = mean_sil_score, col = "MOFA")) +
+  geom_line(data = mofa_bridge_RNA, aes(x = 1740 - bridge_size, y = mean_sil_score, group = 1, col = "MOFA")) +
+  theme_classic()
+  
+ggplot() +
+  geom_point(data = stab_bridge_RNA, aes(x = 1740 - bridge_size, y = stab_knn_acc_bal, col = "StabMap")) +
+  geom_line(data =stab_bridge_RNA, aes(x = 1740 - bridge_size, y = stab_knn_acc_bal, group = 1, col = "StabMap")) +
+  geom_point(data =mofa_bridge_RNA, aes(x = 1740 - bridge_size, y = mofa_knn_acc_bal, col = "MOFA")) +
+  geom_line(data = mofa_bridge_RNA, aes(x = 1740 - bridge_size, y = mofa_knn_acc_bal, group = 1, col = "MOFA")) +
+  theme_classic()
+
+ggplot() +
+  geom_point(data = stab_bridge_RNA, aes(x = 1740 - bridge_size, y = stab_rmse, col = "StabMap")) +
+  geom_line(data =stab_bridge_RNA, aes(x = 1740 - bridge_size, y = stab_rmse, group = 1, col = "StabMap")) +
+  geom_point(data =mofa_bridge_RNA, aes(x = 1740 - bridge_size, y = mofa_rmse, col = "MOFA")) +
+  geom_line(data = mofa_bridge_RNA, aes(x = 1740 - bridge_size, y = mofa_rmse, group = 1, col = "MOFA")) +
+  geom_vline(xintercept = 788) + 
+  scale_x_continuous(breaks = c(seq(0, 2000, by = 500), 788)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+## Random NA
+
+```{r}
+mofa_bridge_rand <- read.table("~/R/Data/mofa_bridge_70_rand_2.txt", header = TRUE)
+
+mofa_bridge_rand_summ <- mofa_bridge_rand %>% group_by(bridge_size) %>%
+                    summarize(
+                      mofa_mean_sil_score_mean = mean(mean_sil_score), 
+                      mofa_mean_sil_score_sd = sd(mean_sil_score),
+                      mofa_knn_acc_bal_mean = mean(knn_acc_bal), 
+                      mofa_knn_acc_bal_sd = sd(knn_acc_bal), 
+                      mofa_rmse_mean = mean(rmse), 
+                      mofa_rmse_sd = sd(rmse)
+                    ) 
+
+ggplot(mofa_bridge_rand_summ) +
+  geom_point(aes(x = bridge_size, y = mofa_mean_sil_score_mean)) +
+  geom_errorbar(aes(x = bridge_size, ymin = mofa_mean_sil_score_mean - mofa_mean_sil_score_sd, ymax = mofa_mean_sil_score_mean + mofa_mean_sil_score_sd), width = 0.05) +
+  geom_line(aes(x = bridge_size, y = mofa_mean_sil_score_mean, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+
+ggplot(mofa_bridge_rand_summ) +
+  geom_point(aes(x = bridge_size, y = mofa_knn_acc_bal_mean)) +
+  geom_errorbar(aes(x = bridge_size, ymin = mofa_knn_acc_bal_mean - mofa_knn_acc_bal_sd, ymax = mofa_knn_acc_bal_mean + mofa_knn_acc_bal_sd), width = 0.05) +
+  geom_line(aes(x = bridge_size, y = mofa_knn_acc_bal_mean, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+
+ggplot(mofa_bridge_rand_summ) +
+  geom_point(aes(x =  bridge_size, y = mofa_rmse_mean)) +
+  geom_errorbar(aes(x =  bridge_size, ymin = mofa_rmse_mean - mofa_rmse_sd, ymax = mofa_rmse_mean + mofa_rmse_sd), width = 0.05) +
+  geom_line(aes(x = bridge_size, y = mofa_rmse_mean, group = 1)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("bridge_size")
+```
+
+```{r}
+stab_bridge_rand <- read.table("~/R/Data/stab_bridge_rand_2.txt", header = TRUE)
+
+
+stab_bridge_rand_summ <- stab_bridge_rand %>%
+  group_by(bridge_size) %>%
+                    summarize(
+                      stab_mean_sil_score_mean = mean(mean_sil_score), 
+                      stab_mean_sil_score_sd = sd(mean_sil_score),
+                      stab_knn_acc_bal_mean = mean(knn_acc_bal), 
+                      stab_knn_acc_bal_sd = sd(knn_acc_bal), 
+                      stab_rmse_mean = mean(rmse), 
+                      stab_rmse_sd = sd(rmse)
+                    )
+
+ggplot(stab_bridge_rand_summ) +
+  geom_point(aes(x = bridge_size, y = stab_mean_sil_score_mean)) +
+  geom_errorbar(aes(x =  bridge_size, ymin = stab_mean_sil_score_mean - stab_mean_sil_score_sd, ymax = stab_mean_sil_score_mean + stab_mean_sil_score_sd), width = 0.05)+
+  geom_line(aes(x =  bridge_size, y = stab_mean_sil_score_mean, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+  
+ggplot(stab_bridge_rand_summ) +
+  geom_point(aes(x = bridge_size, y = stab_knn_acc_bal_mean)) +
+   geom_errorbar(aes(x = bridge_size, ymin = stab_knn_acc_bal_mean - stab_knn_acc_bal_sd, ymax = stab_knn_acc_bal_mean + stab_knn_acc_bal_sd), width = 0.05)+
+  geom_line(aes(x =  bridge_size, y = stab_knn_acc_bal_mean, group = 1)) +
+  theme_classic() +
+  xlab("bridge_size")
+
+ggplot(stab_bridge_rand_summ) +
+  geom_point(aes(x = bridge_size, y = stab_rmse_mean)) +
+    geom_errorbar(aes(x = bridge_size, ymin = stab_rmse_mean - stab_rmse_sd, ymax = stab_rmse_mean + stab_rmse_sd), width = 0.05)+
+  geom_line(aes(x =  bridge_size, y = stab_rmse_mean, group = 1)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  +
+  xlab("bridge_size")
+```
+compare them

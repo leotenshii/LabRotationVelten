@@ -14,7 +14,10 @@ suppressMessages(c(library(scater),
                    library(StabMap)))
 
 
-source("/home/hd/hd_hd/hd_fb235/R/Scripts/adaptiveKNN.R")
+source("~/R/Functions/data_prep_functions.R")
+source("~/R/Functions/integration_metrics_functions.R")
+source("~/R/Functions/adaptiveKNN.R")
+
 
 
 #---------------------------Dataset---------------------------------------------
@@ -31,24 +34,24 @@ metadata <- mae@colData
 # RNA
 sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
-
 # ATAC
-sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.25, 0.05)
 
-logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
+logcounts_all <- as.matrix(rbind(logcounts(sce.rna), logcounts(sce.atac)))
 
-
-#---------------------------General Data----------------------------------------
 
 # Celltypes of all samples
 all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all))) %>%
-  rename( celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
+  rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
 
-# Clusters as numbers
-cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
+# Clusters
+cluster <- as.data.frame(metadata) %>% 
+  group_by(celltype) %>% 
+  summarise(n = n()) %>% 
+  mutate(n = 1:14) 
 
 #---------------------------MOFA------------------------------------------------
-results_mofa <- data.frame(row.names = c("loop", "mean_sil_score", "mofa_knn_acc", "mofa_rsme"))
+results_mofa <- data.frame(row.names = c("loop", "mean_sil_score", "mofa_knn_acc_bal", "mofa_rmse"))
 
 
 # Function to run the MOFA analysis
@@ -58,13 +61,12 @@ run_mofa_analysis <- function(num_factors, outfile) {
   for (i in 1:5) {
     NA_cells <- sample(10032, 5016)
     # Put NAs in data
-    logcounts_allNA <- as.matrix(logcounts_all)
-    logcounts_allNA[953:1740, NA_cells] <- NA
+    logcounts_all[953:1740, NA_cells] <- NA
     
     # Create list for MOFA
     mofa_list <- list(
-      RNA = logcounts_allNA[1:952, ],
-      ATAC = logcounts_allNA[953:1740, ]
+      RNA = logcounts_all[1:952, ],
+      ATAC = logcounts_all[953:1740, ]
     )
     
     # MOFA model and training
@@ -92,7 +94,7 @@ run_mofa_analysis <- function(num_factors, outfile) {
       select(-sample)
     
     #MOFA celltype
-    mofa_sil_sum <- silhoutte_summary(mofa_umap$k, mofa_umap %>% select(UMAP1, UMAP2))
+    mofa_sil_sum <- silhouette_summary(mofa_umap$n, mofa_umap %>% select(UMAP1, UMAP2))
     
     mean_sil_score <- mean(mofa_sil_sum$score)
     
@@ -103,7 +105,7 @@ run_mofa_analysis <- function(num_factors, outfile) {
     names(atac_query) <- rownames(mofa_umap)[NA_cells]
     
     mofa_knn_out <- embeddingKNN(mofa_umap_coord, rna_train, type = "uniform_fixed", k_values = 5)
-    mofa_knn_acc <- mean(isEqual(mofa_knn_out[names(atac_query), "predicted_labels"], atac_query), na.rm = TRUE)
+    mofa_knn_acc_bal <- mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
     
     # Imputation
     trained_model <- impute(trained_model)
@@ -115,26 +117,26 @@ run_mofa_analysis <- function(num_factors, outfile) {
                   rownames_to_column("feature") %>%
                   pivot_longer(-feature, names_to = "sample", values_to = "actual"))
     
-    mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
+    mofa_rmse <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
     
-    results <- rbind(results, c(mean_sil_score, mofa_knn_acc, mofa_rsme))
+    results <- rbind(results, c(mean_sil_score, mofa_knn_acc_bal, mofa_rmse))
   }
   
-  colnames(results) <- c("mean_sil_score", "mofa_knn_acc", "mofa_rsme")
+  colnames(results) <- c("mean_sil_score", "mofa_knn_acc_bal", "mofa_rmse")
   write.table(results, file = outfile, row.names = FALSE)
 }
 
 # Run the analysis for num_factors = 70
-run_mofa_analysis(70, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_70.txt")
+# run_mofa_analysis(70, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_70.txt")
 
 # Run the analysis for num_factors = 15
-run_mofa_analysis(15, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_15.txt")
+# run_mofa_analysis(15, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_15.txt")
 
 
 
 
 #---------------------------StabMap---------------------------------------------
-results_stab <- data.frame(row.names = c("loop", "mean_sil_score", "stab_knn_acc", "stab_rsme"))
+results_stab <- data.frame(row.names = c("loop", "mean_sil_score", "mofa_knn_acc_bal", "stab_rmse"))
 
 # Seperation ATAC Multiome
 names <- c(rep("ATAC", ncol(logcounts_all)/2), rep("Multiome", ncol(logcounts_all)/2))
@@ -172,7 +174,7 @@ for (i in 1:5) {
     column_to_rownames("Row.names")
   
   #StabMap celltype
-  stab_sil_sum <- silhoutte_summary(stab_umap$k, stab_umap %>% select(V1, V2))
+  stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(V1, V2))
 
   mean_sil_score <- mean(stab_sil_sum$score)
   
@@ -186,7 +188,7 @@ for (i in 1:5) {
                               rna_train,
                               type = "uniform_fixed",
                               k_values = 5)
-  stab_knn_acc = mean(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
+  stab_knn_acc_bal <- mean(unlist(lapply(split(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
 
   #---------------------------Imputation------------------------------------------
   imp = imputeEmbedding(
@@ -202,12 +204,12 @@ for (i in 1:5) {
                 rownames_to_column("feature") %>%
                 pivot_longer(-feature, names_to = "sample", values_to = "actual"))
   
-  stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
+  stab_rmse <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
   
-  results_stab <- rbind(results_stab,c(mean_sil_score, stab_knn_acc, stab_rsme))
+  results_stab <- rbind(results_stab,c(mean_sil_score, stab_knn_acc_bal, stab_rmse))
 }
   
-  colnames(results_stab) <- c("mean_sil_score", "stab_knn_acc", "stab_rsme")
+  colnames(results_stab) <- c("mean_sil_score", "stab_knn_acc_bal", "stab_rmse")
   
   write.table(results_stab, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_random_cells_NA.txt")
   

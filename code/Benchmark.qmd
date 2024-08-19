@@ -25,10 +25,20 @@ library(patchwork)
 library(fpc)
 library(MultiAssayExperiment)
 library(plotly)
+
+source("~/R/Functions/data_prep_functions.R")
+source("~/R/Functions/integration_metrics_functions.R")
+source("~/R/Functions/adaptiveKNN.R")
 ```
+
+## Set values
 
 ```{r}
 pathway_dataset <- "~/R/Data/data.RDS"
+
+na_features <-  953:1740
+na_cells <- 1:5016
+
 ```
 
 ## Preparing Data
@@ -58,21 +68,26 @@ sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
 
 # ATAC
-sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.25, 0.05)
 
-logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
+# Combine
+logcounts_all_matrix <- as.matrix(rbind(logcounts(sce.rna), logcounts(sce.atac)))
 
 ```
 
 ## Some general dataframes etc.
 
 ```{r}
+
 # Celltypes of all samples
-all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all))) %>%
-                    rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
+all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all_matrix))) %>%
+                    rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all_matrix))")
 
 # Clusters
-cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
+cluster <- as.data.frame(metadata) %>% 
+  group_by(celltype) %>% 
+  summarise(n = n()) %>% 
+  mutate(n = 1:14) 
 ```
 
 ## StabMap
@@ -80,28 +95,19 @@ cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n())
 ```{r}
 #---------------------------StabMap---------------------------------------------
 
-# Seperation ATAC Multiome
-names <- c(rep("ATAC", ncol(logcounts_all)/2), rep("Multiome", ncol(logcounts_all)/2))
-
-# Assay Types
-assayType = ifelse(rownames(logcounts_all) %in% rownames(sce.rna),
-                   "rna", "atac")
-
-# List for StabMap
-assay_list = list(
-  ATAC = logcounts_all[assayType %in% c("rna"), names %in% c("ATAC")], # 952x5016 -> only RNA in first half of cells
-  Multiome = logcounts_all[assayType %in% c("rna", "atac"), names %in% c("Multiome")] #1740x5016 -> ATAC and RNA, second half of cells
-)
+stab_list <- stab_build_model(data = logcounts_all_matrix, 
+                              na_features =  na_features,
+                              na_cells = na_cells)
 
 
 # StabMap
-mosaicDataUpSet(assay_list)
-plot(mosaicDataTopology(assay_list))
+mosaicDataUpSet(stab_list)
+plot(mosaicDataTopology(stab_list))
 
-stab = stabMap(assay_list,
+stab = stabMap(stab_list,
                ncomponentsReference = 70,
                ncomponentsSubset = 70,
-               reference_list = c("Multiome"),
+               reference_list = c("all_feat"),
                plot = FALSE,
                scale.center = FALSE,
                scale.scale = FALSE)
@@ -111,8 +117,8 @@ stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
 
 
 # Add metadata to the UMAP results (celltype, if it was an NA cell, cluster)
-stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>% 
-                mutate(isNA = ifelse(Row.names %in% colnames(assay_list$ATAC), 1, 0)) %>% # 1 is TRUE, 0 is FALSE
+stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>%
+                mutate(isNA = if_else(Row.names %in% colnames(logcounts_all_matrix                                                        )[na_cells] , "NA", "notNA")) %>%  
                 full_join(cluster) %>%
                 column_to_rownames("Row.names")
 
@@ -123,36 +129,19 @@ stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>%
 ```{r}
 #---------------------------MOFA------------------------------------------------
 
-# Put NAs in data, takes a long time
-# logcounts_allNA <- logcounts_all
-# logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
+model <- mofa_build_model(data = logcounts_all_matrix, 
+                          na_features =  na_features,
+                          na_cells = na_cells,
+                          groupname_with_na = "ATAC",
+                          groupname_without_na = "RNA",
+                          metadata = metadata)
 
-logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
 
-# Create list for MOFA
-mofa_list <- list(
-  RNA =  logcounts_allNA[1:952,],
-  ATAC = logcounts_allNA[953: 1740,]
-)
-
-# MOFA model and training
-model <- create_mofa(mofa_list)
-samples_metadata(model) <- as.data.frame(metadata) %>% 
-                              rownames_to_column("sample") %>% 
-                              mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) # 1 is TRUE, 0 is FALSE
 plot_data_overview(model)
 
 
-model_opts <- get_default_model_options(model)
-model_opts$num_factors <- 70
-#model_opts$spikeslab_weights <- TRUE
-MOFAobject <- prepare_mofa(model,
-                           model_options = model_opts)
-
-  # set.seed(42)
-  # run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
-
-trained_model <- load_model("~/R/Data/model.hdf5")
+trained_model <- mofa_parameter_train(spikeslab_weights = FALSE, 
+                                    model = model)
 
 # UMAP
 trained_model <- run_umap(trained_model)
@@ -161,14 +150,9 @@ mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
 # Add metadata to the UMAP results (celltype, if it was an NA cell, cluster)
 mofa_umap <- merge(trained_model@dim_red$UMAP, all_celltypes, by = 0)  %>%
                 full_join(cluster) %>% 
-                mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) %>%  # 1 is TRUE, 0 is FALSE
+                mutate(isNA = if_else(sample %in% colnames(logcounts_all_matrix                                                        )[na_cells] , "NA", "notNA")) %>%  
                 column_to_rownames("Row.names") %>%
                 select(-sample)
-```
-
-```{r}
-# Test that same cells are NA
-# sum(colnames(mofa_list$ATAC) %in% colnames(assay_list$ATAC))
 ```
 
 # Dimension reduction
@@ -229,16 +213,20 @@ plasmacytoid DC have common ancestor with myeloid dc, their progenitor can also 
 
 ```{r}
 #StabMap celltype
-stab_sil_sum <- silhoutte_summary(stab_umap$k, stab_umap %>% select(V1, V2))
+stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(V1, V2))
 
 #StabMap NA
-stab_sil_sum_NA <- silhoutte_summary(stab_umap$isNA, stab_umap %>% select(V1, V2))
+stab_sil_sum_NA <- silhouette_summary(
+  stab_umap %>% mutate(isNA = ifelse(isNA == "NA", 1, 0)) %>% pull(isNA),
+  stab_umap %>% select(V1, V2))
 
 #MOFA celltype
-mofa_sil_sum <- silhoutte_summary(mofa_umap$k, mofa_umap %>% select(UMAP1, UMAP2))
+mofa_sil_sum <- silhouette_summary(mofa_umap$n, mofa_umap %>% select(UMAP1, UMAP2))
 
 #MOFA NA 
-mofa_sil_sum_NA <- silhoutte_summary(mofa_umap$isNA, mofa_umap %>% select(UMAP1, UMAP2))
+mofa_sil_sum_NA <- silhouette_summary(
+  mofa_umap %>% mutate(isNA = ifelse(isNA == "NA", 1, 0)) %>% pull(isNA), 
+  mofa_umap %>% select(UMAP1, UMAP2))
 ```
 
 Zelltypen: Cluster 5 (effector CD8 T cells) für beide Methoden schlecht --\> -0.4243316 (MOFA). Überschneidet sich mit Kluster 3 (MAIT T cells), Kluster 8 (memory CD4 T cells) und 2 (CD56 (dim) NK cells)
@@ -250,8 +238,8 @@ Mean score für StabMap: 0.39, MOFA: 0.45
 ## More cluster stats
 
 ```{r}
-stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$k)
-mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
+stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$n)
+mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$n)
 ```
 
 ## Celltype accuracy (from StabMap paper)
@@ -265,14 +253,12 @@ uniformed_fixed =\> One fixed k for all
 The balanced result is first mean for celltype, then mean over all celltypes. Unbalanced one is just the mean over all cells
 
 ```{r}
-source("adaptiveKNN.R")
-
 # Predict "ATAC only" cell's cell types 
 # Split Data
-rna_train <- stab_umap$celltype[1:5016]
-names(rna_train) <- rownames(stab_umap)[1:5016]
-atac_query <- stab_umap$celltype[5016:10032]
-names(atac_query) <- rownames(stab_umap)[5016:10032]
+rna_train <- stab_umap$celltype[na_cells]
+names(rna_train) <- rownames(stab_umap)[na_cells]
+atac_query <- stab_umap$celltype[setdiff(1:ncol(logcounts_all_matrix), na_cells)]
+names(atac_query) <- rownames(stab_umap)[setdiff(1:ncol(logcounts_all_matrix), na_cells)]
 
 # StabMap
 stab_knn_out = embeddingKNN(stab_umap_coord,
@@ -315,109 +301,98 @@ from WNN paper: get predicted expression of a gene (They used CD25 since it is h
 ```{r}
 #---------------------------Imputation------------------------------------------
 imp = imputeEmbedding(
-  assay_list,
+  stab_list,
   stab,
-  reference = colnames(assay_list[["Multiome"]]),
-  query = colnames(assay_list[["ATAC"]]))
+  reference = colnames(stab_list[["all_feat"]]),
+  query = colnames(stab_list[["missing_feat"]]))
 
 trained_model <- impute(trained_model)
+
 # imp$Multiome[953:963, 1:5]
 # trained_model@imputed_data$ATAC[[1]][1:10, 1:5]
 
 ```
 
-## RSME
+## RE
 
 ```{r}
-# StabMap
-# Dataframe with predicted and real values
+stab_rmse <- rmse_imp(imp_data = imp$all_feat[na_features,], 
+                      real_data = logcounts_all_matrix, 
+                      na_features = na_features, 
+                      na_cells = na_cells)
 
-stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
-                  rownames_to_column("feature") %>%
-                  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-                  full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
-                  rownames_to_column("feature") %>%
-                  pivot_longer(-feature, names_to = "sample", values_to = "actual"))
+mofa_rmse<- rmse_imp(imp_data = trained_model@imputed_data$groupname_with_na[[1]][,na_cells],
+                     real_data = logcounts_all_matrix, 
+                     na_features = na_features, 
+                      na_cells = na_cells)
 
-stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
-# MOFA
-mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
-                  rownames_to_column("feature") %>%
-                  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-                  full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
-                  rownames_to_column("feature") %>%
-                  pivot_longer(-feature, names_to = "sample", values_to = "actual"))
-
-mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
-
-cat(" StabMap RSME:", stab_rsme, "\n", "MOFA RSME:",mofa_rsme )
-
+cat(" StabMap RMSE:", stab_rmse, "\n", "MOFA RMSE:",mofa_rmse )
 ```
 
 ## Comparison against baseline
 
 ```{r}
-stab_baseline_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
-                        rownames_to_column("feature") %>%
-                        pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-                        full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))) %>%
-                            rownames_to_column("feature")) %>%
-                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all[assayType %in% c("atac"), 5017:10032])))`)
-
-stab_mae <- mean(abs(stab_baseline_comp$predicted - stab_baseline_comp$baseline))
-
-
-mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
-                  rownames_to_column("feature") %>%
-                  pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-                        full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))) %>%
-                            rownames_to_column("feature")) %>%
-                        rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))`)
-
-mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
+# stab_baseline_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
+#                         rownames_to_column("feature") %>%
+#                         pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+#                         full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all_matrix[assayType %in% c("atac"), 5017:10032])))) %>%
+#                             rownames_to_column("feature")) %>%
+#                         rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all_matrix[assayType %in% c("atac"), 5017:10032])))`)
+# 
+# stab_mae <- mean(abs(stab_baseline_comp$predicted - stab_baseline_comp$baseline))
+# 
+# 
+# mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all_matrix)/2)]) %>%
+#                   rownames_to_column("feature") %>%
+#                   pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
+#                         full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all_matrixNA[953:1740, 5017:10032])))) %>%
+#                             rownames_to_column("feature")) %>%
+#                         rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all_matrixNA[953:1740, 5017:10032])))`)
+# 
+# mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
 ```
 
 Plots for a random feature
 
 ```{r}
-stab_baseline_comp %>%
-  filter(feature == "chr1:994735-1006799") %>%
-  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-  mutate(diff = (predicted - baseline)) %>%
-  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-    ggplot() +
-  geom_col(aes(x = sample, y = diff, fill = celltype)) +
-  ggtitle("StabMap")
-
-
-
-mofa_baseline_comp %>%
-  filter(feature == "chr1:994735-1006799") %>%
-  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-  mutate(diff = (predicted - baseline)) %>%
-  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-    ggplot() +
-  geom_col(aes(x = sample, y = diff, fill = celltype)) +
-  ggtitle("MOFA")
-
-
-# Comparing with the diff of the actual and predicted values
-mofa_baseline_comp %>%
-  filter(feature == "chr1:994735-1006799") %>%
-  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-  left_join(mofa_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
-  mutate(diff = (actual - predicted)) %>%
-  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-    ggplot() +
-  geom_col(aes(x = sample, y = diff, fill = celltype)) 
-
-stab_baseline_comp %>%
-  filter(feature == "chr1:994735-1006799") %>%
-  left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-  left_join(stab_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
-  mutate(diff = (actual - predicted)) %>%
-  mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-    ggplot() +
-  geom_col(aes(x = sample, y = diff, fill = celltype))
+# stab_baseline_comp %>%
+#   filter(feature == "chr1:994735-1006799") %>%
+#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+#   mutate(diff = (predicted - baseline)) %>%
+#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+#     ggplot() +
+#   geom_col(aes(x = sample, y = diff, fill = celltype)) +
+#   ggtitle("StabMap")
+# 
+# 
+# 
+# mofa_baseline_comp %>%
+#   filter(feature == "chr1:994735-1006799") %>%
+#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+#   mutate(diff = (predicted - baseline)) %>%
+#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+#     ggplot() +
+#   geom_col(aes(x = sample, y = diff, fill = celltype)) +
+#   ggtitle("MOFA")
+# 
+# 
+# # Comparing with the diff of the actual and predicted values
+# mofa_baseline_comp %>%
+#   filter(feature == "chr1:994735-1006799") %>%
+#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+#   left_join(mofa_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
+#   mutate(diff = (actual - predicted)) %>%
+#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+#     ggplot() +
+#   geom_col(aes(x = sample, y = diff, fill = celltype)) 
+# 
+# stab_baseline_comp %>%
+#   filter(feature == "chr1:994735-1006799") %>%
+#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
+#   left_join(stab_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
+#   mutate(diff = (actual - predicted)) %>%
+#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
+#     ggplot() +
+#   geom_col(aes(x = sample, y = diff, fill = celltype))
 
 ```

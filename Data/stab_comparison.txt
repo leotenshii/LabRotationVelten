@@ -1,4 +1,4 @@
-"ncomponentsReference" "ncomponentsSubset" "maxFeatures" "scale.center" "scale.scale" "project_all" "mean_sil_score" "min_sil_score" "max_sil_score" "stab_knn_acc" "stab_knn_acc_bal" "stab_rsme" "stab_mae" "time_integration" "time_imputation"
+"ncomponentsReference" "ncomponentsSubset" "maxFeatures" "scale.center" "scale.scale" "project_all" "mean_sil_score" "min_sil_score" "max_sil_score" "stab_knn_acc" "stab_knn_acc_bal" "stab_rmse" "stab_mae" "time_integration" "time_imputation"
 "elapsed" 30 30 1000 TRUE TRUE TRUE 0.449943966725428 -0.263306172123465 0.977237570162619 0.874028303767192 0.838122777893997 1.28667251779438 0.945187863003638 2.077 58.471
 "elapsed1" 40 30 1000 TRUE TRUE TRUE 0.440332305974378 -0.231174211538682 0.982135114269144 0.876220849113016 0.847006017294673 1.28462175115954 0.942744762067212 2.068 59.977
 "elapsed2" 50 30 1000 TRUE TRUE TRUE 0.441499142004679 -0.258418967550751 0.985617098871012 0.87123779150887 0.844511952462033 1.28406648124113 0.941853999689736 2.15600000000001 63.216

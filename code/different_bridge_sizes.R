@@ -14,7 +14,9 @@ suppressMessages(c(library(scater),
                    library(StabMap)))
 
 
-source("/home/hd/hd_hd/hd_fb235/R/Scripts/adaptiveKNN.R")
+source("~/R/Functions/data_prep_functions.R")
+source("~/R/Functions/integration_metrics_functions.R")
+source("~/R/Functions/adaptiveKNN.R")
 
 
 #---------------------------Dataset---------------------------------------------
@@ -31,24 +33,26 @@ metadata <- mae@colData
 # RNA
 sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
-
 # ATAC
-sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.25, 0.05)
 
-logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
-
+logcounts_all <- as.matrix(rbind(logcounts(sce.rna), logcounts(sce.atac)))
 
 #---------------------------General Data----------------------------------------
+na_cells <- 1:5016
 
 # Celltypes of all samples
 all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all))) %>%
   rename( celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
 
 # Clusters as numbers
-cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
+cluster <- as.data.frame(metadata) %>% 
+  group_by(celltype) %>% 
+  summarise(n = n()) %>% 
+  mutate(n = 1:14) 
 
 #---------------------------MOFA------------------------------------------------
-results_mofa <- data.frame(row.names = c("bridge_size", "mean_sil_score", "mofa_knn_acc", "mofa_rsme"))
+
 
 
 # Function to run the MOFA analysis
@@ -56,33 +60,20 @@ run_mofa_analysis <- function(bridge_size, outfile) {
   results <- data.frame()
   
   for (i in 1:length(bridge_size)) {
-    print(length(bridge_size))
-    current_bridge_size <- bridge_size[i]  # Use a different variable name
-    print(current_bridge_size)
-    na_features <- sample(1740, current_bridge_size)
+    current_bridge_size <- 1740 - bridge_size[i]
+    print(paste("Current bridge size:", 1740 + current_bridge_size))
+    #na_features <- sample(1740, current_bridge_size)
+    na_features <-  current_bridge_size:1740
+    #na_features <-  1:current_bridge_size
+    print(length(na_features))
     
-    logcounts_allNA <- as.matrix(logcounts_all)
-    logcounts_allNA[na_features, 1:5016] <- NA
+    model <- mofa_build_model(data = logcounts_all,
+                              na_features = na_features,
+                              na_cells = na_cells,
+                              metadata = metadata)
     
-    # Create list for MOFA
-    mofa_list <- list(
-      with_na_features = logcounts_allNA[na_features, ],
-      no_na_features = logcounts_allNA[-na_features, ]
-    )
-    
-    # MOFA model and training
-    model <- create_mofa(mofa_list)
-    samples_metadata(model) <- as.data.frame(metadata) %>% 
-      rownames_to_column("sample")
-    plot_data_overview(model)
-    
-    model_opts <- get_default_model_options(model)
-    model_opts$num_factors <- 15
-    MOFAobject <- prepare_mofa(model, model_options = model_opts)
-    
-    # Integration
-    run_mofa(MOFAobject, outfile = "R/Data/model.hdf5", use_basilisk = TRUE)
-    trained_model <- load_model("R/Data/model.hdf5")
+    trained_model <- mofa_parameter_train(num_factors = 70, spikeslab_weights = FALSE, 
+                                          model = model)
     
     # UMAP
     trained_model <- run_umap(trained_model)
@@ -95,125 +86,147 @@ run_mofa_analysis <- function(bridge_size, outfile) {
       select(-sample)
     
     # MOFA celltype
-    mofa_sil_sum <- silhoutte_summary(mofa_umap$k, mofa_umap %>% select(UMAP1, UMAP2))
+    mofa_sil_sum <- silhouette_summary(mofa_umap$n, mofa_umap %>% select(UMAP1, UMAP2))
     mean_sil_score <- mean(mofa_sil_sum$score)
+    print(mean_sil_score)
     
     # Predict "ATAC only" cell's cell types
-    rna_train <- mofa_umap$celltype[5016:10032]
-    names(rna_train) <- rownames(mofa_umap)[5016:10032]
-    atac_query <- mofa_umap$celltype[1:5016]
-    names(atac_query) <- rownames(mofa_umap)[1:5016]
+    rna_train <- mofa_umap$celltype[na_cells]
+    names(rna_train) <- rownames(mofa_umap)[na_cells]
+    atac_query <- mofa_umap$celltype[setdiff(1:ncol(logcounts_all), na_cells)]
+    names(atac_query) <- rownames(mofa_umap)[setdiff(1:ncol(logcounts_all), na_cells)]
     
     mofa_knn_out <- embeddingKNN(mofa_umap_coord, rna_train, type = "uniform_fixed", k_values = 5)
-    mofa_knn_acc <- mean(isEqual(mofa_knn_out[names(atac_query), "predicted_labels"], atac_query), na.rm = TRUE)
+    mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+    
+    print(mofa_knn_acc_bal)
     
     # Imputation
     trained_model <- impute(trained_model)
     
-    mofa_imp_comp <- as.data.frame(trained_model@imputed_data$with_na_features[[1]][, 1:5016]) %>%
-      rownames_to_column("feature") %>%
-      pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-      full_join(as.data.frame(as.matrix(logcounts_all[na_features, 1:5016])) %>%
-                  rownames_to_column("feature") %>%
-                  pivot_longer(-feature, names_to = "sample", values_to = "actual"))
+    # mofa_rsme<- rsme_imp(imp_data = trained_model@imputed_data$groupname_with_na[[1]][,na_cells],
+    #                      real_data = logcounts_all,
+    #                      na_features = na_features,
+    #                      na_cells = na_cells)
     
-    mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
+    # Seperated RSME version
+    mofa_rsme_tbl <- rsme_imp_table(imp_data = trained_model@imputed_data$groupname_with_na[[1]][,na_cells],
+                         real_data = logcounts_all,
+                         na_features = na_features,
+                         na_cells = na_cells)
     
-    results <- rbind(results, c(1740 - current_bridge_size, mean_sil_score, mofa_knn_acc, mofa_rsme))
+    mofa_rsme_tbl_atac <- mofa_rsme_tbl %>%
+                        filter(feature %in% rownames(sce.atac))
+    
+    mofa_rsme_tbl_rna <- mofa_rsme_tbl %>%
+                        filter(feature %in% rownames(sce.rna))
+    
+    mofa_rsme_atac <- sqrt(mean((mofa_rsme_tbl_atac$actual - mofa_rsme_tbl_atac$predicted)^2, na.rm = TRUE))
+    mofa_rsme_rna <- sqrt(mean((mofa_rsme_tbl_rna$actual - mofa_rsme_tbl_rna$predicted)^2, na.rm = TRUE))
+    
+
+    
+    results <- rbind(results, c(current_bridge_size, mean_sil_score, mofa_knn_acc_bal, mofa_rsme_atac, mofa_rsme_rna))
   }
   
-  colnames(results) <- c("bridge_size", "mean_sil_score", "mofa_knn_acc", "mofa_rsme")
+  colnames(results) <- c("bridge_size", "mean_sil_score", "mofa_knn_acc_bal", "mofa_rsme_atac", "mofa_rsme_rna")
   write.table(results, file = outfile, row.names = FALSE)
 }
 
 # Run the analysis for num_factors = 70
-run_mofa_analysis(c(1305, 870), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge.txt")
-
-
-# Run the analysis for num_factors = 15
-# run_mofa_analysis(15, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_15.txt")
-
-
+run_mofa_analysis(c(17), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_sep_3.txt")
 
 
 #---------------------------StabMap---------------------------------------------
-results_stab <- data.frame(row.names = c("loop", "mean_sil_score", "stab_knn_acc", "stab_rsme"))
 
-# Seperation ATAC Multiome
-names <- c(rep("ATAC", ncol(logcounts_all)/2), rep("Multiome", ncol(logcounts_all)/2))
 
-# Assay Types
-assayType = ifelse(rownames(logcounts_all) %in% rownames(sce.rna),
-                   "rna", "atac")
-for (i in 1:5) {
-  names <- sample(names)
+run_stab_analysis <- function(bridge_size, outfile) {
+  results <- data.frame()
+  for (i in 1:length(bridge_size)) {
+    
+    current_bridge_size <- 1740 - bridge_size[i]
+    print(paste("Current bridge size:", 1740 - current_bridge_size))
+    #na_features <- sample(1740, current_bridge_size)
+    na_features <-  current_bridge_size:1740
+    #na_features <-  1:current_bridge_size
+    
+    stab_list <- stab_build_model(data = logcounts_all, 
+                                  na_features =  na_features,
+                                  na_cells = na_cells)
+    
+    
+    stab = stabMap(stab_list,
+                   ncomponentsReference = 70,
+                   ncomponentsSubset = 70,
+                   reference_list = c("all_feat"),
+                   plot = FALSE,
+                   scale.center = FALSE,
+                   scale.scale = FALSE,
+                   maxFeatures = 1740)
+    
+    
+    # UMAP
+    stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
+    
+    
+    # Add metadata to the UMAP results (celltype, if it was an NA cell, cluster)
+    stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>%
+      full_join(cluster) %>%
+      column_to_rownames("Row.names")
+    
+    stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(V1, V2))
+    mean_sil_score <- mean(stab_sil_sum$score)
+    
+    rna_train <- stab_umap$celltype[na_cells]
+    names(rna_train) <- rownames(stab_umap)[na_cells]
+    atac_query <- stab_umap$celltype[setdiff(1:ncol(logcounts_all), na_cells)]
+    names(atac_query) <- rownames(stab_umap)[setdiff(1:ncol(logcounts_all), na_cells)]
+    
+    # StabMap
+    stab_knn_out = embeddingKNN(stab_umap_coord,
+                                rna_train,
+                                type = "uniform_fixed",
+                                k_values = 5)
+    stab_knn_acc_bal = mean(unlist(lapply(split(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
+    
+    imp = imputeEmbedding(
+      stab_list,
+      stab,
+      reference = colnames(stab_list[["all_feat"]]),
+      query = colnames(stab_list[["missing_feat"]]))
+    
+#     stab_rsme <- rsme_imp(imp_data = imp$all_feat[na_features,], 
+#                           real_data = logcounts_all, 
+#                           na_features = na_features, 
+#                           na_cells = na_cells)
+#     
+
+    
+    # Seperated RSME version
+    stab_rsme_tbl <- rsme_imp_table(imp_data = imp$all_feat[na_features,], 
+                                    real_data = logcounts_all, 
+                                    na_features = na_features, 
+                                    na_cells = na_cells)
+    
+    stab_rsme_tbl_atac <- stab_rsme_tbl %>%
+      filter(feature %in% rownames(sce.atac))
+    
+    stab_rsme_tbl_rna <- stab_rsme_tbl %>%
+      filter(feature %in% rownames(sce.rna))
+    
+    stab_rsme_atac <- sqrt(mean((stab_rsme_tbl_atac$actual - stab_rsme_tbl_atac$predicted)^2, na.rm = TRUE))
+    stab_rsme_rna <- sqrt(mean((stab_rsme_tbl_rna$actual - stab_rsme_tbl_rna$predicted)^2, na.rm = TRUE))
+    
+    
+    
+    results <- rbind(results, c(current_bridge_size, mean_sil_score, stab_knn_acc_bal, stab_rsme_atac, stab_rsme_rna))
+  }
   
-  # List for StabMap
-  assay_list = list(
-    ATAC = logcounts_all[assayType %in% c("rna"), names %in% c("ATAC")], # 952x5016 -> only RNA in first half of cells
-    Multiome = logcounts_all[assayType %in% c("rna", "atac"), names %in% c("Multiome")] #1740x5016 -> ATAC and RNA, second half of cells
-  )
-  
-  
-  # StabMap
-  mosaicDataUpSet(assay_list)
-  stab = stabMap(assay_list,
-                 ncomponentsReference = 70,
-                 ncomponentsSubset = 70,
-                 reference_list = c("Multiome"),
-                 plot = FALSE,
-                 scale.center = FALSE,
-                 scale.scale = FALSE)
-  
-  # UMAP
-  stab_umap_coord <- as.data.frame(calculateUMAP(t(stab)))
-  
-  
-  # Add metadata to the UMAP results (celltype, if it was an NA cell, cluster)
-  stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>%
-    full_join(cluster) %>%
-    column_to_rownames("Row.names")
-  
-  stab_sil <- silhouette(stab_umap$k, dist(stab_umap %>% select(V1, V2)))
-  stab_sil_sum <- stab_sil %>% 
-    as.data.frame() %>% group_by(cluster) %>% summarise(score = mean(sil_width), 
-                                                        frac_pos = sum(sil_width > 0)/n(),
-                                                        pos_score = sum((sil_width>0)*sil_width)/sum(sil_width > 0)) #average quality of clustering for the well-clustered data points within each cluster
-  mean_sil_score <- mean(stab_sil_sum$score)
-  
-  rna_train <- stab_umap$celltype[names == "Multiome"]
-  names(rna_train) <- rownames(stab_umap)[names == "Multiome"]
-  atac_query <- stab_umap$celltype[names != "Multiome"]
-  names(atac_query) <- rownames(stab_umap)[names != "Multiome"]
-  
-  # StabMap
-  stab_knn_out = embeddingKNN(stab_umap_coord,
-                              rna_train,
-                              type = "uniform_fixed",
-                              k_values = 5)
-  stab_knn_acc = mean(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
-  
-  #---------------------------Imputation------------------------------------------
-  imp = imputeEmbedding(
-    assay_list,
-    stab,
-    reference = colnames(assay_list[["Multiome"]]),
-    query = colnames(assay_list[["ATAC"]]))
-  
-  stab_imp_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
-    rownames_to_column("feature") %>%
-    pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-    full_join(as.data.frame(as.matrix(logcounts_all[953:1740, names != "Multiome"])) %>%
-                rownames_to_column("feature") %>%
-                pivot_longer(-feature, names_to = "sample", values_to = "actual"))
-  
-  stab_rsme <- sqrt(mean((stab_imp_comp$actual - stab_imp_comp$predicted)^2))
-  
-  results_stab <- rbind(results_stab,c(mean_sil_score, stab_knn_acc, stab_rsme))
+  colnames(results) <- c("bridge_size", "mean_sil_score", "stab_knn_acc_bal", "stab_rsme_atac", "stab_rsme_rna")
+  write.table(results, file = outfile, row.names = FALSE)
 }
 
-colnames(results_stab) <- c("mean_sil_score", "stab_knn_acc", "stab_rsme")
 
-write.table(results_stab, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_random_cells_NA.txt")
+run_stab_analysis(c(17), "/home/hd/hd_hd/hd_fb235/R/Data/stab_bridge_sep_3.txt")
 
 

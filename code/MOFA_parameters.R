@@ -32,7 +32,7 @@ sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
 
 # ATAC
-sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.01, 0.05)
+sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.25, 0.05)
 
 logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
 
@@ -44,7 +44,10 @@ all_celltypes <- as.data.frame( setNames(metadata$celltype, colnames(logcounts_a
   rename( celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
 
 # Clusters as numbers
-cluster <- as.data.frame(metadata) %>% group_by(celltype) %>% summarise(n = n()) %>% mutate(k = 1:14) %>% select(-n)
+cluster <- as.data.frame(metadata) %>% 
+  group_by(celltype) %>% 
+  summarise(n = n()) %>% 
+  mutate(n = 1:14) 
 
 #---------------------------MOFA------------------------------------------------
 
@@ -158,10 +161,10 @@ for (i in 1:nrow(param_grid)) {
     select(-sample)
   
   # Silhouette scores
-  mofa_sil_sum <- silhoutte_summary(mofa_umap$k, mofa_umap %>% select(UMAP1, UMAP2))
+  mofa_sil_sum <- silhouette_summary(mofa_umap$n, mofa_umap %>% select(UMAP1, UMAP2))
   
   # Clustering stats
-  mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$k)
+  mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$n)
   dunn <- mofa_cluster_stats$dunn
   
   # Cell Type Accuracy
@@ -177,7 +180,7 @@ for (i in 1:nrow(param_grid)) {
   mofa_knn_acc = mean(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
   mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
   
-  # RSME
+  # RMSE
   imputation_time_all <- system.time(trained_model <- impute(trained_model))
   
   mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
@@ -187,18 +190,9 @@ for (i in 1:nrow(param_grid)) {
                 rownames_to_column("feature") %>%
                 pivot_longer(-feature, names_to = "sample", values_to = "actual"))
   
-  mofa_rsme <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
+  mofa_rmse <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
   
-  # Comparison Baseline
-  
-  mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
-    rownames_to_column("feature") %>%
-    pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-    full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))) %>%
-                rownames_to_column("feature")) %>%
-    rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_allNA[953:1740, 5017:10032])))`)
-  
-  mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
+
   
   # Store results
 
@@ -220,8 +214,7 @@ for (i in 1:nrow(param_grid)) {
     mofa_cluster_stats = mofa_cluster_stats,
     mofa_knn_acc = mofa_knn_acc,
     mofa_knn_acc_bal = mofa_knn_acc_bal,
-    mofa_rsme = mofa_rsme,
-    mofa_mae = mofa_mae,
+    mofa_rmse = mofa_rmse,
     time_integration = time_integration_all,
     imputation_time = imputation_time_all
   )
@@ -245,8 +238,7 @@ comparison <- data.frame(
   dunn = numeric(),
   mofa_knn_acc = numeric(),
   mofa_knn_acc_bal = numeric(),
-  mofa_rsme = numeric(),
-  mofa_mae = numeric(),
+  mofa_rmse = numeric(),
   time_integration = numeric(),
   imputation_time = numeric()
 )
@@ -260,8 +252,7 @@ for (param_name in names(results)) {
   dunn <- res$dunn
   mofa_knn_acc <- res$mofa_knn_acc
   mofa_knn_acc_bal <- res$mofa_knn_acc_bal
-  mofa_rsme <- res$mofa_rsme
-  mofa_mae <- res$mofa_mae
+  mofa_rmse <- res$mofa_rmse
   time_integration <- res$time_integration[3]
   imputation_time <- res$imputation_time[3]
   
@@ -280,8 +271,7 @@ for (param_name in names(results)) {
     dunn = dunn,
     mofa_knn_acc = mofa_knn_acc,
     mofa_knn_acc_bal = mofa_knn_acc_bal,
-    mofa_rsme = mofa_rsme,
-    mofa_mae = mofa_mae,
+    mofa_rmse = mofa_rmse,
     time_integration = time_integration,
     imputation_time = imputation_time
   ))

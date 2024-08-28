@@ -1,6 +1,15 @@
-# Functions ---------------------------------------------------------------
+# Last changes on 28.08.2024
+# Author: Leoni Zimmermann
 
+# Description ------------------------------------------------------------------
+# The functions are used for calculating integration and imputation metrics.
+# silhouette_summary returns per cluster the mean silhouette width, proportion of observations that are well-clustered (having a positive silhouette width) 
+#       and the average of the positive silhouette widths, highlighting the quality of clustering among well-clustered points only 
+# rmse_imp returns the RMSE calculated from the imputated and real data
+# rmse_imp_table returns the table with the predicted (imputed) and actual values. 
+#       I use this to go from the table to two seperate RMSE calculation for different features (e.g. ATAC RMSE and RNA RMSE). Could also have been integrated in rmse_imp but I just didn't :)
 
+# Functions --------------------------------------------------------------------
 silhouette_summary <- function(cluster_numbers, coordinates) {
   sil <- silhouette(cluster_numbers, dist(coordinates))
   sil_sum <- sil %>% 

@@ -1,4 +1,14 @@
-# Functions ---------------------------------------------------------------
+# Last changes on 28.08.2024
+# Author: Leoni Zimmermann
+
+# Description ------------------------------------------------------------------
+# This set of functions is designed to spped up the beginning of most of my script
+# normalize_and_select_features log normalizes the data and selects features on variance
+# mofa_build_model builds the mofa model and adds the metadata
+# mofa_parameter_train trains the mofa model. It can also return the time needed for training
+# stab_build_model builds the list used for StabMap calculations
+
+# Functions --------------------------------------------------------------------
 
 normalize_and_select_features <- function(data, expr_mean_threshold, p_value_threshold) {
   # The function log normalizes the input data
@@ -10,14 +20,14 @@ normalize_and_select_features <- function(data, expr_mean_threshold, p_value_thr
 }
 
 
-mofa_build_model <- function(data, na_features, na_cells, groupname_with_na, groupname_without_na, metadata) {
+mofa_build_model <- function(data, na_features, na_cells, metadata) {
 
   logcounts_allNA <- data
   logcounts_allNA[na_features, na_cells] <- NA
   
   mofa_list <- list(
-    groupname_with_na = logcounts_allNA[na_features, ],
-    groupname_without_na = logcounts_allNA[setdiff(1:nrow(logcounts_allNA), na_features), ]
+    missing_feat = logcounts_allNA[na_features, ],
+    all_feat = logcounts_allNA[setdiff(1:nrow(logcounts_allNA), na_features), ]
   )
   
   model <- create_mofa(mofa_list)

@@ -1,13 +1,18 @@
 ---
 title: "Benchmark"
 author: "Leoni Zimmermann"
+date: 28/08/2024
 html:
   code-fold: true
   code-summary: "Show the code"
 editor: visual
 ---
 
-# Prep
+# Summary
+
+This quarto document will go through the creation of the artifical dataset, MOFA and StabMap model and the calculation and visualization of different integration and imputation metrics.
+
+# Data Preperation
 
 ## Libraries
 
@@ -38,7 +43,6 @@ pathway_dataset <- "~/R/Data/data.RDS"
 
 na_features <-  953:1740
 na_cells <- 1:5016
-
 ```
 
 ## Preparing Data
@@ -46,12 +50,10 @@ na_cells <- 1:5016
 Load Data
 
 ```{r}
-#---------------------------Dataset---------------------------------------------
 # Peripheral Blood Mononuclear Cells provided by 10x Genomics website
 # 10x Genomics Multiome technology enables simultaneous profiling of the transcriptome 
 # (using 3’ gene expression) and epigenome (using ATAC-seq) from single cells to deepen 
 # our understanding of how genes are expressed and regulated across different cell types.
-
 # mae <- scMultiome("pbmc_10x", mode = "*", dry.run = FALSE, format = "MTX")
 
 # Loaded from RDS cause I cant install the SingleCellMultiModal package
@@ -62,26 +64,22 @@ metadata <- mae@colData
 Normalization
 
 ```{r}
-#---------------------------Data preparation------------------------------------
 # RNA
 sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
-
 
 # ATAC
 sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.25, 0.05)
 
 # Combine
 logcounts_all_matrix <- as.matrix(rbind(logcounts(sce.rna), logcounts(sce.atac)))
-
 ```
 
 ## Some general dataframes etc.
 
 ```{r}
-
 # Celltypes of all samples
-all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all_matrix))) %>%
-                    rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all_matrix))")
+all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all_matrix)))
+colnames(all_celltypes) <- "celltype"
 
 # Clusters
 cluster <- as.data.frame(metadata) %>% 
@@ -90,20 +88,19 @@ cluster <- as.data.frame(metadata) %>%
   mutate(n = 1:14) 
 ```
 
+# Create input and training for MOFA and StabMap
+
 ## StabMap
 
 ```{r}
-#---------------------------StabMap---------------------------------------------
-
 stab_list <- stab_build_model(data = logcounts_all_matrix, 
                               na_features =  na_features,
                               na_cells = na_cells)
 
-
-# StabMap
 mosaicDataUpSet(stab_list)
 plot(mosaicDataTopology(stab_list))
 
+# Training
 stab = stabMap(stab_list,
                ncomponentsReference = 70,
                ncomponentsSubset = 70,
@@ -121,27 +118,20 @@ stab_umap <- merge( as.data.frame(metadata), stab_umap_coord, by =0 ) %>%
                 mutate(isNA = if_else(Row.names %in% colnames(logcounts_all_matrix                                                        )[na_cells] , "NA", "notNA")) %>%  
                 full_join(cluster) %>%
                 column_to_rownames("Row.names")
-
 ```
 
-## MOFA model
+## MOFA
 
 ```{r}
-#---------------------------MOFA------------------------------------------------
-
 model <- mofa_build_model(data = logcounts_all_matrix, 
-                          na_features =  na_features,
+                          na_features = na_features,
                           na_cells = na_cells,
-                          groupname_with_na = "ATAC",
-                          groupname_without_na = "RNA",
                           metadata = metadata)
-
 
 plot_data_overview(model)
 
-
-trained_model <- mofa_parameter_train(spikeslab_weights = FALSE, 
-                                    model = model)
+# Training
+trained_model <- mofa_parameter_train(spikeslab_weights = FALSE, model = model)
 
 # UMAP
 trained_model <- run_umap(trained_model)
@@ -155,27 +145,28 @@ mofa_umap <- merge(trained_model@dim_red$UMAP, all_celltypes, by = 0)  %>%
                 select(-sample)
 ```
 
-# Dimension reduction
+# Integration
 
 ## Comparison UMAPS
 
 ```{r}
 # MOFA
-UM1 <- plot_dimred(trained_model, method = "UMAP", color_by = "celltype", dot_size =1) + ggtitle("MOFA celltype")
-UM2 <- plot_dimred(trained_model, method = "UMAP", color_by = "isNA", dot_size =1)+ ggtitle("MOFA NA")
-UM3 <- plot_dimred(trained_model, method = "UMAP", color_by = "broad_celltype", dot_size =1)+ ggtitle("MOFA broad celltype")
+UM1 <- plot_dimred(trained_model, method = "UMAP", color_by = "celltype", dot_size =1) +           ggtitle("MOFA celltype")
+UM2 <- plot_dimred(trained_model, method = "UMAP", color_by = "isNA", dot_size =1)+               ggtitle("MOFA NA")
+UM3 <- plot_dimred(trained_model, method = "UMAP", color_by = "broad_celltype",dot_size =1)+ 
+          ggtitle("MOFA broad celltype")
 
 # StabMap
 US1 <- ggplot(stab_umap) +
-  geom_point(aes(x = V1, y = V2, color = celltype), size = .1) +
+  geom_point(aes(x = UMAP1, y = UMAP2, color = celltype), size = .1) +
   theme_light() +
   ggtitle("StabMap celltype")
 US2 <- ggplot(stab_umap) +
-  geom_point(aes(x = V1, y = V2, color = isNA), size = .1) +
+  geom_point(aes(x = UMAP1, y = UMAP2, color = isNA), size = .1) +
   theme_light() +
   ggtitle("StabMap NA")
 US3 <- ggplot(stab_umap) +
-  geom_point(aes(x = V1, y = V2, color = broad_celltype), size = .1) +
+  geom_point(aes(x = UMAP1, y = UMAP2, color = broad_celltype), size = .1) +
   theme_light() +
   ggtitle("StabMap broad celltype")
 
@@ -187,73 +178,67 @@ print(combined_plot)
 # ggplotly(UM1)
 ```
 
-Nach Zelltyp: Mittelmäßig aufgetrennt
+There is no separation according to whether a cell has missing ATAC features or not. This means that the cells were not integrated based on this characteristic. When colouring by broad cell type (lymphoid or myeloid), a clear separation can be seen. f you analyse the plot for the specific cell type, a good separation can be seen where neighbouring clusters are mostly related cell types.
 
-Nach groben Zelltyp: Gut aufgetrennt
+## Silhouette width
 
-Nach NA: Gut verteilt/nicht aufgetrennt (so sollte es sein)
+The silhouette width is a commonly used metric to assess clustering quality. It measures how similar an object (here: cell) is to its own cluster (here: celltype) compared to others. It ranges from 1 to -1 with higher values indicating better matches.
 
-Myeloid cells:
-
-Classical Monocytes --\> intermediate MC --\> non-classical MC
-
-Monocytes and dendritic cells (DC) have common ancestor
-
-Lymphoid cells:
-
-naive and memory B cells together (good)
-
-plasmacytoid DC have common ancestor with myeloid dc, their progenitor can also make plasmacytoid dc
-
-```         
-"CD56 (bright) NK cells"  "CD56 (dim) NK cells"     "MAIT T cells"  "effector CD8 T cells"  "memory CD4 T cells"  "naive CD4 T cells" naive CD8 T cells
-```
-
-## Silhouette
+The mean silhouette width per cluster (in the following called silhouette score) is calculated for both "celltypes" and "cells with missing features" as cluster input.
 
 ```{r}
-#StabMap celltype
-stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(V1, V2))
+# StabMap celltype
+stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(UMAP1, UMAP2))
+mean(stab_sil_sum$score)
 
-#StabMap NA
+# StabMap NA
 stab_sil_sum_NA <- silhouette_summary(
   stab_umap %>% mutate(isNA = ifelse(isNA == "NA", 1, 0)) %>% pull(isNA),
-  stab_umap %>% select(V1, V2))
+  stab_umap %>% select(UMAP1, UMAP2))
 
-#MOFA celltype
+# MOFA celltype
 mofa_sil_sum <- silhouette_summary(mofa_umap$n, mofa_umap %>% select(UMAP1, UMAP2))
+mean(mofa_sil_sum$score)
 
-#MOFA NA 
+# MOFA NA 
 mofa_sil_sum_NA <- silhouette_summary(
   mofa_umap %>% mutate(isNA = ifelse(isNA == "NA", 1, 0)) %>% pull(isNA), 
   mofa_umap %>% select(UMAP1, UMAP2))
 ```
 
-Zelltypen: Cluster 5 (effector CD8 T cells) für beide Methoden schlecht --\> -0.4243316 (MOFA). Überschneidet sich mit Kluster 3 (MAIT T cells), Kluster 8 (memory CD4 T cells) und 2 (CD56 (dim) NK cells)
+"Cells with missing features" cluster:
 
-Plasmocytoid DC cells für beide Methoden am besten
+For both StabMap and MOFA the results for the score are close to zero, suggesting a well mixture.
 
-Mean score für StabMap: 0.39, MOFA: 0.45
+"Celltypes" clusters:
+
+Cluster five (effector CD8 T cells) has a negative score, suggesting bad clustering. The number of clusters with a score below 0.5 (considered as reasonable) is seven for MOFA and 9 for StabMap out of 14 clusters total.
+
+The mean scores are 0.46 for MOFA and 0.42 for StabMap.
 
 ## More cluster stats
 
+More cluster stats that could be of interest:
+
 ```{r}
-stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$n)
+stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(UMAP1, UMAP2)), stab_umap$n)
 mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$n)
 ```
 
-## Celltype accuracy (from StabMap paper)
+## Celltype accuracy 
 
-Given a joint embedding, we perform a simulation such that discrete class labels corresponding to cell types are artificially removed (atac_query are the "removed" ones) for a subset of the data. We then perform k-nearest neighbors classification (k=5) to obtain the predicted class label for the artificially unlabeled data. The cell type classification accuracy is thus the proportion of cells for which the classification is correct compared to the true cell type label
+This metric was taken from the StabMap paper. Their description:
 
-Find the k-nearest neighbors in one data set for each point in another query data set, using exact or approximate algorithms
+Given a joint embedding, we perform a simulation such that discrete class labels corresponding to cell types are artificially removed for a subset of the data. We then perform k-nearest neighbors classification (k=5) to obtain the predicted class label for the artificially unlabeled data. The cell type classification accuracy is thus the proportion of cells for which the classification is correct compared to the true cell type label
 
-uniformed_fixed =\> One fixed k for all
+The cell labels from atac_query are the removed ones.
 
-The balanced result is first mean for celltype, then mean over all celltypes. Unbalanced one is just the mean over all cells
+uniformed_fixed denotes that there is one fixed k for all cells.
+
+While knn_acc is the accuracy of the k-NN predictions, knn_acc_bal represents the balanced accuracy, giving equal weight to each cell type regardless of its size. knn_acc_bal will be used for later evaluation since some clusters have more cells than others.
 
 ```{r}
-# Predict "ATAC only" cell's cell types 
+# Predict "RNA only" cell's cell types 
 # Split Data
 rna_train <- stab_umap$celltype[na_cells]
 names(rna_train) <- rownames(stab_umap)[na_cells]
@@ -278,56 +263,45 @@ mofa_knn_acc_bal = mean(unlist(lapply(split(isEqual(mofa_knn_out[names(atac_quer
 
 # Result
 cat(" Accuracy StabMap: ", stab_knn_acc,"/",stab_knn_acc_bal,"(per celltype)", "\n","Accuracy MOFA: ", mofa_knn_acc,"/",mofa_knn_acc_bal,"(per celltype)")
-
 ```
 
-Interpretation result
-
-## Ideas
-
-from WNN paper: get predicted expression of a gene (They used CD25 since it is hard to distinguish T cells in the dim reduction) from averaging the neighbors expression. THen calculate Correlation (Pearson and SPearman) to get quality
-
-```{r}
-# CD25
-# plot_dimred(trained_model, method = "UMAP", color_by = "IL2RA", dot_size =1)+ ggtitle("MOFA CD25")
-
-# CD57
-# plot_dimred(trained_model, method = "UMAP", color_by = "", dot_size =1)+ ggtitle("MOFA CD57")
-
-```
+The MOFA method demonstrates superior cell type accuracy in comparison to StabMap, which is likely attributed to the more effective clustering by MOFA.
 
 # Imputation
 
 ```{r}
-#---------------------------Imputation------------------------------------------
+# StabMap
 imp = imputeEmbedding(
   stab_list,
   stab,
   reference = colnames(stab_list[["all_feat"]]),
   query = colnames(stab_list[["missing_feat"]]))
 
+# MOFA
 trained_model <- impute(trained_model)
-
-# imp$Multiome[953:963, 1:5]
-# trained_model@imputed_data$ATAC[[1]][1:10, 1:5]
-
 ```
 
-## RE
+## RMSE
+
+The root mean square error measures the difference between predicted and observed values. This is possible since the dataset has artifically removed ATAC features for half of the cells.
 
 ```{r}
+# StabMap
 stab_rmse <- rmse_imp(imp_data = imp$all_feat[na_features,], 
                       real_data = logcounts_all_matrix, 
                       na_features = na_features, 
                       na_cells = na_cells)
 
-mofa_rmse<- rmse_imp(imp_data = trained_model@imputed_data$groupname_with_na[[1]][,na_cells],
+# MOFA
+mofa_rmse<- rmse_imp(imp_data = trained_model@imputed_data$missing_feat[[1]][,na_cells],
                      real_data = logcounts_all_matrix, 
                      na_features = na_features, 
                       na_cells = na_cells)
 
 cat(" StabMap RMSE:", stab_rmse, "\n", "MOFA RMSE:",mofa_rmse )
 ```
+
+MOFA shows a smaller and thus better RMSE than StabMap.
 
 ## Comparison against baseline
 

@@ -1,3 +1,0 @@
-"ncomponentsReference" "ncomponentsSubset" "maxFeatures" "scale.center" "scale.scale" "project_all" "mean_sil_score" "stab_knn_acc" "stab_knn_acc_bal" "stab_rmse" "time_integration" "time_imputation"
-"elapsed" 10 10 1000 FALSE FALSE FALSE 0.328769679779147 0.838317384370016 0.793053278393734 0.950963975732206 1.14800000000002 54.405
-"elapsed1" 15 15 1000 FALSE FALSE FALSE 0.369413943060933 0.85506379585327 0.81886894807749 0.94839178761846 1.20299999999997 53.809

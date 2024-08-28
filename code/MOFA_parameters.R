@@ -1,3 +1,9 @@
+# Last changes on 28.08.2024
+# Author: Leoni Zimmermann
+
+#---------------------------Description-----------------------------------------
+# This script runs MOFA with a range of different parameters.
+
 #---------------------------Seed------------------------------------------------
 set.seed(42)
 
@@ -13,8 +19,9 @@ suppressMessages(c(library(scater),
                    library(MultiAssayExperiment)))
 
 
-source("/home/hd/hd_hd/hd_fb235/R/Scripts/adaptiveKNN.R")
-
+source("~/R/Functions/adaptiveKNN.R")
+source("~/R/Functions/data_prep_functions.R")
+source("~/R/Functions/integration_metrics_functions.R")
 
 #---------------------------Dataset---------------------------------------------
 # Peripheral Blood Mononuclear Cells provided by 10x Genomics website
@@ -25,23 +32,18 @@ source("/home/hd/hd_hd/hd_fb235/R/Scripts/adaptiveKNN.R")
 # Loaded from RDS cause I cant install the SingleCellMultiModal package
 mae <- readRDS("/home/hd/hd_hd/hd_fb235/R/Data/data.RDS")
 metadata <- mae@colData
-
 #---------------------------Data preparation------------------------------------
 # RNA
 sce.rna <- normalize_and_select_features(experiments(mae)[["rna"]], 0.01, 0.05)
 
-
 # ATAC
 sce.atac <- normalize_and_select_features(experiments(mae)[["atac"]], 0.25, 0.05)
 
-logcounts_all <- rbind(logcounts(sce.rna), logcounts(sce.atac))
-
-
+logcounts_all <- as.matrix(rbind(logcounts(sce.rna), logcounts(sce.atac)))
 #---------------------------General Data----------------------------------------
-
 # Celltypes of all samples
-all_celltypes <- as.data.frame( setNames(metadata$celltype, colnames(logcounts_all))) %>%
-  rename( celltype = "setNames(metadata$celltype, colnames(logcounts_all))")
+all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all)))
+colnames(all_celltypes) <- "celltype"
 
 # Clusters as numbers
 cluster <- as.data.frame(metadata) %>% 
@@ -49,43 +51,28 @@ cluster <- as.data.frame(metadata) %>%
   summarise(n = n()) %>% 
   mutate(n = 1:14) 
 
+na_features <-  953:1740
+na_cells <- 1:5016
 #---------------------------MOFA------------------------------------------------
-
-# Put NAs in data, takes a long time
-# logcounts_allNA <- logcounts_all
-# logcounts_allNA[953:1740, 1:ncol(logcounts_all)/2] <- NA
-
-logcounts_allNA <- readRDS("~/R/Data/logcountsNA.RDS")
-
-# Create list for MOFA
-mofa_list <- list(
-  RNA =  logcounts_allNA[1:952,],
-  ATAC = logcounts_allNA[953: 1740,]
-)
-
-# MOFA model 
-model <- create_mofa(mofa_list)
-samples_metadata(model) <- as.data.frame(metadata) %>% 
-  rownames_to_column("sample") %>% 
-  mutate(isNA =  c(rep(1, ncol(logcounts_all)/2), rep(0, ncol(logcounts_all) - ncol(logcounts_all)/2))) # 1 is TRUE (so it is NA), 0 is FALSE
-
-# MOFAobject <- prepare_mofa(model)
+# Create model for MOFA
+model <- mofa_build_model(data = logcounts_all, 
+                 na_features = na_features,
+                 na_cells = na_cells,
+                 metadata = metadata)
 
 # Get differnt model settings
 data_opts <- get_default_data_options(model)
 model_opts <- get_default_model_options(model)
-# train_opts <- get_default_training_options(MOFAobject)
+
 
 #---------------------------Parameters------------------------------------------
 
 
 param_grid <- expand.grid(
-  scale_views = c(FALSE),
+  scale_views = c(TRUE, FALSE),
   num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
   # spikeslab_factors = c(TRUE, FALSE),
-  spikeslab_weights = c(FALSE)
-  # ard_factors = c(TRUE,FALSE), # gruppen ebene
-  # ard_weights = c(TRUE,FALSE)
+  spikeslab_weights = c(TRUE, FALSE)
 )
 
 
@@ -129,27 +116,14 @@ for (i in 1:nrow(param_grid)) {
       ", num_factors =", params$num_factors,
       # ", spikeslab_factors =", params$spikeslab_factors,
       ", spikeslab_weights =", params$spikeslab_weights)
-      # ", ard_factors =", params$ard_factors,
-      # ", ard_weights =", params$ard_weights)
   
-
+  mofa_results <- mofa_parameter_train(scale_views = params$scale_views, num_factors = params$num_factors, spikeslab_weights = params$spikeslab_weights, model, return_time = TRUE)
+  
   # Run MOFA with current parameters
+  time_integration_all <- mofa_results[[1]]
+  trained_model <- mofa_results[[2]]
+  
 
-  data_opts$scale_views <- params$scale_views
-  model_opts$num_factors <- params$num_factors
-  # model_opts$spikeslab_factors <- params$spikeslab_factors
-  model_opts$spikeslab_weights <- params$spikeslab_weights
-  # model_opts$ard_factors <- params$ard_factors
-  # model_opts$ard_factors <- params$ard_weights
-     
-    
-  MOFAobject <- prepare_mofa(model, 
-                             data_options = data_opts,
-                             model_options = model_opts)
-  
-  set.seed(42)
-  time_integration_all <- system.time(trained_model <- run_mofa(MOFAobject, use_basilisk = TRUE))
-  
   # UMAP
   trained_model <- run_umap(trained_model)
   mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
@@ -168,10 +142,10 @@ for (i in 1:nrow(param_grid)) {
   dunn <- mofa_cluster_stats$dunn
   
   # Cell Type Accuracy
-  rna_train <- mofa_umap$celltype[1:5016]
-  names(rna_train) <- rownames(mofa_umap)[1:5016]
-  atac_query <- mofa_umap$celltype[5016:10032]
-  names(atac_query) <- rownames(mofa_umap)[5016:10032]
+  rna_train <- mofa_umap$celltype[na_cells]
+  names(rna_train) <- rownames(mofa_umap)[na_cells]
+  atac_query <- mofa_umap$celltype[setdiff(1:ncol(logcounts_all), na_cells)]
+  names(atac_query) <- rownames(mofa_umap)[setdiff(1:ncol(logcounts_all), na_cells)]
   
   mofa_knn_out = embeddingKNN(mofa_umap_coord,
                                rna_train,
@@ -183,16 +157,10 @@ for (i in 1:nrow(param_grid)) {
   # RMSE
   imputation_time_all <- system.time(trained_model <- impute(trained_model))
   
-  mofa_imp_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all)/2)]) %>%
-    rownames_to_column("feature") %>%
-    pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-    full_join(as.data.frame(as.matrix(logcounts_all[953:1740, 1:(ncol(logcounts_all)/2)])) %>%
-                rownames_to_column("feature") %>%
-                pivot_longer(-feature, names_to = "sample", values_to = "actual"))
-  
-  mofa_rmse <- sqrt(mean((mofa_imp_comp$actual - mofa_imp_comp$predicted)^2))
-  
-
+  mofa_rmse<- rmse_imp(imp_data = trained_model@imputed_data$missing_feat[[1]][,na_cells],
+                       real_data = logcounts_all, 
+                       na_features = na_features, 
+                       na_cells = na_cells)
   
   # Store results
 
@@ -201,8 +169,6 @@ for (i in 1:nrow(param_grid)) {
     "num_factor", params$num_factor,
     # "spikeslab_factors", params$spikeslab_factors,
     "spikeslab_weights", params$spikeslab_weights,
-    # "ard_factors", params$ard_factors,
-    # "ard_weights", params$ard_weights,
     sep = "_"
   )
   
@@ -230,8 +196,6 @@ comparison <- data.frame(
   num_factor = integer(),
   # spikeslab_factors = logical(),
   spikeslab_weights = logical(),
-  # ard_factors = logical(),
-  # ard_weights = logical(),
   mean_sil_score = numeric(),
   min_sil_score = numeric(),
   max_sil_score = numeric(),
@@ -263,8 +227,6 @@ for (param_name in names(results)) {
     num_factor = as.numeric(param_values[6]),
     # spikeslab_factors = as.logical(param_values[9]),
     spikeslab_weights = as.logical(param_values[9]),
-    # ard_factors = as.logical(param_values[12]),
-    # ard_weights = as.logical(param_values[15]),
     mean_sil_score = mean_sil_score,
     min_sil_score = min_sil_score,
     max_sil_score = max_sil_score,
@@ -280,9 +242,18 @@ for (param_name in names(results)) {
 
 print(comparison)
 
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
+
+# For this file:
+# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_numfactors.txt")
+# change to:
+# param_grid <- expand.grid(
+#   scale_views = c(FALSE),
+#   num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
+#   spikeslab_weights = c(FALSE)
+# )
 
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_numfactors.txt")
 
 
 

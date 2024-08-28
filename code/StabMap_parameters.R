@@ -1,3 +1,9 @@
+# Last changes on 28.08.2024
+# Author: Leoni Zimmermann
+
+#---------------------------Description-----------------------------------------
+# This script runs StabMap with a range of different parameters.
+
 #---------------------------Libraries-------------------------------------------
 suppressMessages(c(
   library(scater),
@@ -9,7 +15,7 @@ suppressMessages(c(
   library(fpc),
   library(MultiAssayExperiment)))
 
-source("/home/hd/hd_hd/hd_fb235/R/Scripts/adaptiveKNN.R")
+source("~/R/Functions/adaptiveKNN.R")
 source("~/R/Functions/data_prep_functions.R")
 source("~/R/Functions/integration_metrics_functions.R")
 
@@ -20,12 +26,12 @@ na_features <-  953:1740
 na_cells <- 1:5016
 
 param_grid <- expand.grid(
-  ncomponentsReference = c( 10, 15, 20, 30, 40, 50, 60, 70), 
-  #ncomponentsSubset = c( 15, 30, 40, 50, 70),
-  maxFeatures = c(1000), 
-  scale.center = c( FALSE), 
-  scale.scale = c( FALSE),
-  project_all = c(FALSE) 
+  ncomponentsReference = c( 15, 30, 40, 50, 70), 
+  ncomponentsSubset = c( 15, 30, 40, 50, 70),
+  maxFeatures = c(1000, 1500, 1740, 2700), 
+  scale.center = c(TRUE, FALSE), 
+  scale.scale = c(TRUE, FALSE),
+  project_all = c(TRUE, FALSE) 
 )
 
 #---------------------------Dataset---------------------------------------------
@@ -49,8 +55,8 @@ logcounts_all_matrix <- as.matrix(rbind(logcounts(sce.rna), logcounts(sce.atac))
 
 
 # Celltypes of all samples
-all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all_matrix))) %>%
-                    rename(celltype = "setNames(metadata$celltype, colnames(logcounts_all_matrix))")
+all_celltypes <- as.data.frame(setNames(metadata$celltype, colnames(logcounts_all_matrix)))
+colnames(all_celltypes) <- "celltype"
 
 # Clusters
 cluster <- as.data.frame(metadata) %>% 
@@ -73,7 +79,8 @@ results <- list()
 for (i in 1:nrow(param_grid)) {
   params <- param_grid[i, ]
   
-  params$ncomponentsSubset <- params$ncomponentsReference
+  # When we want both PC to be the same
+  # params$ncomponentsSubset <- params$ncomponentsReference 
   
   # Print current parameters 
   cat("Running stabMap with ncomponentsReference =", params$ncomponentsReference,
@@ -94,8 +101,7 @@ time_integration <- system.time(  stab <- stabMap(
     scale.center = params$scale.center,
     scale.scale = params$scale.scale,
     projectAll = params$project_all,
-    plot = FALSE
-  ))
+    plot = FALSE))
   
 
   # UMAP
@@ -106,11 +112,11 @@ time_integration <- system.time(  stab <- stabMap(
     column_to_rownames("Row.names")
   
   # Calculate silhouette scores
-  stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(V1, V2))
+  stab_sil_sum <- silhouette_summary(stab_umap$n, stab_umap %>% select(UMAP1, UMAP2))
   
   
   # Calculate clustering stats
-  stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(V1, V2)), stab_umap$n, silhouette = FALSE)
+  stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(UMAP1, UMAP2)), stab_umap$n, silhouette = FALSE)
   dunn <- stab_cluster_stats$dunn
   
   # Cell Type Accuracy
@@ -126,7 +132,7 @@ time_integration <- system.time(  stab <- stabMap(
   stab_knn_acc = mean(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), na.rm = TRUE)
   stab_knn_acc_bal = mean(unlist(lapply(split(isEqual(stab_knn_out[names(atac_query),"predicted_labels"], atac_query), atac_query), mean, na.rm = TRUE)))
   
-  # rmse
+  # RMSE
   
   time_imputation <- system.time(imp <- imputeEmbedding(
     stab_list,
@@ -148,8 +154,7 @@ time_integration <- system.time(  stab <- stabMap(
     "scale.center", params$scale.center,
     "scale.scale", params$scale.scale,
     "project_all", params$project_all,
-    sep = "_"
-  )
+    sep = "_")
   
   results[[param_str]] <- list(
     stab_sil_sum = stab_sil_sum,
@@ -157,9 +162,7 @@ time_integration <- system.time(  stab <- stabMap(
     stab_knn_acc_bal = stab_knn_acc_bal,
     stab_rmse = stab_rmse,
     time_integration = time_integration[3],
-    time_imputation = time_imputation[3]
-  )
-  
+    time_imputation = time_imputation[3])
   
 }
 
@@ -207,4 +210,17 @@ for (param_name in names(results)) {
   ))
 }
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_numfactors_2.txt")
+
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison.txt")
+
+# For this file: 
+# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_numfactors.txt")
+# use 
+# param_grid <- expand.grid(
+#   ncomponentsReference = c( 10, 15, 20, 30, 40, 50, 60, 70), 
+#   maxFeatures = c(1000), 
+#   scale.center = c(FALSE), 
+#   scale.scale = c(FALSE),
+#   project_all = c(FALSE) 
+# )
+# and uncomment line 77

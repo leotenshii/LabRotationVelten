@@ -1,0 +1,257 @@
+---
+title: "Integration of T-chimera and seqFISH data using StabMap with spatial neighbor feature extraction"
+author: "Leoni Zimmermann"
+format: html
+editor: visual
+---
+
+# Information
+
+This document is a skeleton for recreating Fig.4e from the paper [*Stabilized mosaic single-cell data integration using unshared features*](https://www.nature.com/articles/s41587-023-01766-z) with MOFA+.In this state it produces two data-sets, integrates them and impute missing values. These imputed expression values can then be plotted on the cells from the spatial assay.
+
+The original code for this can be found here:
+
+\[[1](https://github.com/MarioniLab/StabMap2021/blob/main/example/MGD_seqFISH_generate.Rmd)\] : Generation of seqFISH mouse gastrulation data and incorporating neighborhood expression information.
+
+\[[2](https://github.com/MarioniLab/StabMap2021/blob/main/example/MGD_chimera_generate.Rmd)\] : Generation of the scRNA-seq data by combining a mouse gastrulation atlas with wild- type and mutant chimera datasets.
+
+\[[3](https://github.com/MarioniLab/StabMap2021/blob/main/example/MGD_chimera_StabMap_SeqFISH_example.Rmd)\] : Workflow for integrating scRNA-seq and seqFISH data. Starts with feature selection for the scRNA-seq, then with and without batch correction integration with StabMap.
+
+\[[4](https://github.com/MarioniLab/StabMap2021/blob/main/example/MGD_chimera_StabMap_SeqFISH_example_downstream.Rmd)\] : Differential abundance testing, binominal GLM testing and visualization of the results.
+
+Parts of the code where extracted to give an early overview. The parts mainly missing are
+
+-   Neighborhood expression information in the seqFISH data
+
+-   Batch correction
+
+-   Script 4
+
+The code from this document can be used to get an easy start into this project and add the missing parts one by one. The missing parts can be extracted from the linked scripts.
+
+**Warning**: The data is very big! Let it run as a script on a server or select only a subset of the data for testing. Nothing here is optimized in any way.
+
+# Preparation 
+
+```{r}
+set.seed(42)
+
+library(MouseGastrulationData)
+library(scater)
+library(scran)
+library(tidyverse)
+library(MOFA2)
+library(StabMap)
+```
+
+# Data Generation
+
+## scRNA-seq data
+
+Three dataset will be combined: E8.5 mouse gastrulation atlas, WT/WT chimera and T^−/−^/WT chimera scRNA-seq data. The data is loaded from the MouseGastrulationData Bioconductor package.
+
+```{r}
+stages <- c("E8.5")
+mt <- MouseGastrulationData::AtlasSampleMetadata
+samples <- mt[mt[, "stage"] %in% stages, "sample"]
+
+atlas_raw <- EmbryoAtlasData(type = "processed", samples = samples)
+atlas_raw <- logNormCounts(atlas_raw)
+
+# Get which samples are wildtype / knockout
+wt_samples <- c(5,6,7,8,9,10)
+t_samples <- c(1,2,5,6,7,8,9,10)
+
+wt_chim_raw <- MouseGastrulationData::WTChimeraData(
+  type = "processed",
+  samples = wt_samples)
+wt_chim_raw <- logNormCounts(wt_chim_raw)
+
+t_chim_raw <- MouseGastrulationData::TChimeraData(
+  type = "processed",
+  samples = t_samples)
+t_chim_raw <- logNormCounts(t_chim_raw)
+
+
+# Generate a joint SCE with all three datasets
+scrna_cells <- c(paste0("atlas_", colnames(atlas_raw)),
+                paste0("wt_chim_", colnames(wt_chim_raw)),
+                paste0("t_chim_", colnames(t_chim_raw)))
+
+scrna_sample <- c(paste0("atlas_", atlas_raw$sample),
+                 paste0("wt_chim_", wt_chim_raw$sample),
+                 paste0("t_chim_", t_chim_raw$sample))
+
+scrna_celltype <- c(atlas_raw$celltype,
+                   wt_chim_raw$celltype.mapped,
+                   t_chim_raw$celltype.mapped)
+
+scrna_experiment <- c(rep("atlas", ncol(atlas_raw)),
+                     rep("wt_chim", ncol(wt_chim_raw)),
+                     rep("t_chim", ncol(t_chim_raw)))
+
+scrna_tomato <- c(rep(NA, ncol(atlas_raw)),
+                 wt_chim_raw$tomato,
+                 t_chim_raw$tomato)
+
+scrna_cData <- data.frame(
+  cell = scrna_cells,
+  sample = scrna_sample,
+  celltype = scrna_celltype,
+  experiment = scrna_experiment,
+  tomato = scrna_tomato)
+
+scrna_exprs <- cbind(
+  rbind(logcounts(atlas_raw), "tomato-td" = 0),
+  logcounts(wt_chim_raw),
+  logcounts(t_chim_raw))
+
+colnames(scrna_exprs) <- scrna_cData$cell
+
+scrna <- SingleCellExperiment(assays = list(logcounts = scrna_exprs),
+                             colData = scrna_cData,
+                             rowData = rowData(wt_chim_raw))
+
+# save the object as RDS
+saveRDS(scrna, file = "~/R/Data/MGD_chimera_scrna.Rds")
+```
+
+## seqFISh data
+
+Data can be downloaded from:
+
+<https://content.cruk.cam.ac.uk/jmlab/SpatialMouseAtlas2020/>.
+
+Download `metadata.Rds` and `exprs.Rds`. For adding the neighborhood expression you will need to also download `neighbourGraph_1.3.Rds.`
+
+```{r}
+meta <- readRDS("~/R/Data/metadata.Rds")
+exprs <- readRDS("~/R/Data/exprs.Rds")
+
+seqFISH <- SingleCellExperiment(assays = list(logcounts = exprs),
+                           colData = meta)
+seqFISH <- seqFISH[, seqFISH$embryo == "embryo1"] # I used only embryo 1 of 3 total to reduce                                               computation time
+
+saveRDS(seqFISH, file = "~/R/Data/seqFISH.Rds")
+```
+
+# Feature selection
+
+Feature selection only for scRNA-seq data, seqFISH has already so little features that we don't select further.
+
+```{r}
+decomp <- modelGeneVar(scrna, block = scrna$sample)
+hvgs <- rownames(decomp)[decomp$mean>0.01 & decomp$p.value <= 0.05]
+length(hvgs) #3399
+scrna <- scrna[hvgs,]
+
+rownames(scrna) <- make.unique(rowData(scrna)$SYMBOL)
+```
+
+# Integration
+
+## StabMap
+
+To be able to compare we also perform the integration with StabMap
+
+```{r}
+# Input
+assay_list <- list(seqFISH = seqFISH,
+                   scrna = as.matrix(logcounts(scrna)))
+
+# Running StabMap
+stab <- stabMap(assay_list,
+                reference_list = c("scrna", "seqFISH"),
+                projectAll = TRUE,
+                plot = FALSE,
+                scale.center = TRUE,
+                scale.scale = TRUE)
+
+# Impute missing values
+stab_imp <- imputeEmbedding(assay_list,
+                       stab,
+                       reference = colnames(assay_list[["scrna"]]),
+                       query = colnames(assay_list[["seqFISH"]]))
+
+saveRDS(imp, "~/R/Data/stab_imp.RDS")
+```
+
+## MOFA
+
+For MOFA we need to put the two datasets into one (also possible to do [groups](#0) instead)
+
+```{r}
+# Combine scRNA and seqFISH tables
+
+combined_df <- merge(
+  as.data.frame(as.matrix(logcounts(seqFISH))),
+  as.data.frame(as.matrix(logcounts(scrna))),
+  by = "row.names", 
+  all = TRUE
+)
+
+rownames(combined_df) <- combined_df$Row.names
+combined_matrix$Row.names <- NULL
+combined_matrix <- as.matrix(combined_df)
+
+# Create and prepare MOFA model
+mofa_model <- create_mofa(list(combined_matrix))
+
+model_opts <- get_default_model_options(model)
+  
+model_opts$num_factors <- 70            # Those are parameters I found good for 
+model_opts$spikeslab_weights <- FALSE   # imputation but feel free to change
+
+MOFAobject <- prepare_mofa(mofa_model, model_options = model_opts)
+
+# Train
+trained_model <- run_mofa(MOFAobject, use_basilisk = TRUE))
+
+  # Impute missing values
+trained_model <- impute(trained_model)
+
+saveRDS(trained_model, "~/R/Data/trained_modelSeqFISH.RDS")
+```
+
+# Plots
+
+## StabMap
+
+```{r}
+# Join with metadata to get cell coordinates
+stab_imp_long <- stab_imp_embryo1 %>%
+  as.data.frame() %>%
+  rownames_to_column("gene") %>%
+  pivot_longer(cols = -gene, names_to = "uniqueID", values_to = "expr") %>%
+  inner_join(as.data.frame(meta), by = "uniqueID")
+
+# Filter for one gene and tissue of interest
+stab_imp_filtered <- stab_imp_long %>%
+  filter(gene == "T") %>% 
+  mutate(expr = ifelse(celltype_mapped_refined == "Splanchnic mesoderm", expr, NA))
+
+ggplot(stab_imp_filtered, aes(x = x_global, y = -y_global, col = expr)) + 
+  geom_point( size = 0.5) + 
+  scale_color_viridis_c(na.value = "lightgray") +
+  theme_void()
+```
+
+## MOFA
+
+```{r}
+trained_model_long <- trained_model@imputed_data$view_1$group1 %>%
+  as.data.frame() %>%
+  rownames_to_column("gene") %>%
+  pivot_longer(cols = -gene, names_to = "uniqueID", values_to = "expr") %>%
+  inner_join(as.data.frame(meta), by = "uniqueID")
+
+# Filter data and plot
+filtered_data <- trained_model_long %>%
+  filter(gene == "Nr2f1") %>%
+  mutate(expr = ifelse(celltype_mapped_refined == "Splanchnic mesoderm", expr, NA))
+
+ggplot(filtered_data, aes(x = x_global, y = -y_global, color = expr)) +
+  geom_point(size = 0.5) +
+  scale_color_viridis_c(na.value = "lightgray") +
+  theme_void()
+```

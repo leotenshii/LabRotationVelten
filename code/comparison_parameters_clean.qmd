@@ -42,7 +42,7 @@ mofa_plot_metric_for_diff_factors <- function(data, parameter, metric, col = NA,
     p <- p + geom_point(aes(x = {{parameter}}, y = {{metric}}, col = {{col}}), alpha = 0.25)
     p <- p + guides(col = guide_legend(title = gsub(".*\\$", "", deparse(substitute(col)))))
   } else {
-    p <- p + geom_point(aes(x = {{parameter}}, y = {{metric}}), alpha = 0.25, col = "gray")
+    p <- p + geom_point(aes(x = {{parameter}}, y = {{metric}}), alpha = 0.5, col = "gray")
   }
   return(p)
 }
@@ -61,7 +61,7 @@ stab_plot_metric_for_diff_factors <- function(data, metric, col = NA, ...) {
     p <- p + geom_point(aes(x = ncomponentsReference, y = {{metric}}, col = {{col}}), alpha = 0.25)
     p <- p + guides(col = guide_legend(title = gsub(".*\\$", "", deparse(substitute(col)))))
   } else {
-    p <- p + geom_point(aes(x = ncomponentsReference, y = {{metric}}), alpha = 0.25, col = "gray")
+    p <- p + geom_point(aes(x = ncomponentsReference, y = {{metric}}), alpha = 0.5, col = "gray")
   }
   return(p)
 }
@@ -134,7 +134,7 @@ Integration and imputation were performed with various combinations of different
 print(mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mean_sil_score, col = mofa_param_comparison$scale_views, 
                                         title = "Mean silhouette score for different number of factors", x = "Number of factors", y = "Mean silhouette score") +
       mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mofa_knn_acc_bal, 
-                                        title = "Mean mofa_knn_acc_bal for different number of factors", x = "Number of factors", y = "Mean mofa_knn_acc_bal") +  
+                                        title = "Mean mofa_knn_acc_bal for different number of factors", x = "Number of factors", y = "Mean celltype accuracy") +  
       mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mofa_rmse, 
                                         title = "Mean RMSE for different number of factors", x = "Number of factors", y = "Mean RMSE") +
       plot_annotation(title = 'Influence of different number of factors for integration and imputation with MOFA'))
@@ -181,14 +181,14 @@ for (j in 1:6) {
 Results for MOFA:
 
 | Parameter         | Integration                              | Imputation                                               | Optimal setting |
-|-----------------|-----------------|---------------------|-----------------|
+|-------------------|------------------------------------------|----------------------------------------------------------|-----------------|
 | scale_views       | Slightly better when FALSE               | Slightly better when TRUE, but insignificant difference  | FALSE           |
 | spikeslab_weights | Mixed results, overall better when FALSE | Slightly better when FALSE, but insignificant difference | FALSE           |
 
 Results for StabMap:
 
 | Parameter    | Integration              | Imputation               | Optimal setting                                                        |
-|-----------------|-----------------|-----------------|----------------------|
+|--------------|--------------------------|--------------------------|------------------------------------------------------------------------|
 | PC Subset    | Insignificant difference | Insignificant difference | Same number as PC reference (since both have the same amount of cells) |
 | maxFeatures  | <!--# Maybe rerun -->    |                          | <!--# Maybe all? Didnt test it for MOFA -->                            |
 | scale.center | Better when TRUE         | Better when TRUE         | FALSE                                                                  |

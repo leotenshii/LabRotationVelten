@@ -225,7 +225,7 @@ stab_cluster_stats <- cluster.stats(dist(stab_umap %>% select(UMAP1, UMAP2)), st
 mofa_cluster_stats <- cluster.stats(dist(mofa_umap %>% select(UMAP1, UMAP2)), mofa_umap$n)
 ```
 
-## Celltype accuracy 
+## Celltype accuracy
 
 This metric was taken from the StabMap paper. Their description:
 
@@ -302,71 +302,3 @@ cat(" StabMap RMSE:", stab_rmse, "\n", "MOFA RMSE:",mofa_rmse )
 ```
 
 MOFA shows a smaller and thus better RMSE than StabMap.
-
-## Comparison against baseline
-
-```{r}
-# stab_baseline_comp <- as.data.frame(as.matrix(imp$Multiome)[953:1740,]) %>%
-#                         rownames_to_column("feature") %>%
-#                         pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-#                         full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all_matrix[assayType %in% c("atac"), 5017:10032])))) %>%
-#                             rownames_to_column("feature")) %>%
-#                         rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all_matrix[assayType %in% c("atac"), 5017:10032])))`)
-# 
-# stab_mae <- mean(abs(stab_baseline_comp$predicted - stab_baseline_comp$baseline))
-# 
-# 
-# mofa_baseline_comp <- as.data.frame(trained_model@imputed_data$ATAC[[1]][,1:(ncol(logcounts_all_matrix)/2)]) %>%
-#                   rownames_to_column("feature") %>%
-#                   pivot_longer(-feature, names_to = "sample", values_to = "predicted") %>%
-#                         full_join(as.data.frame(rowMeans(as.data.frame(as.matrix(logcounts_all_matrixNA[953:1740, 5017:10032])))) %>%
-#                             rownames_to_column("feature")) %>%
-#                         rename(baseline = `rowMeans(as.data.frame(as.matrix(logcounts_all_matrixNA[953:1740, 5017:10032])))`)
-# 
-# mofa_mae <- mean(abs(mofa_baseline_comp$predicted - mofa_baseline_comp$baseline))
-```
-
-Plots for a random feature
-
-```{r}
-# stab_baseline_comp %>%
-#   filter(feature == "chr1:994735-1006799") %>%
-#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-#   mutate(diff = (predicted - baseline)) %>%
-#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-#     ggplot() +
-#   geom_col(aes(x = sample, y = diff, fill = celltype)) +
-#   ggtitle("StabMap")
-# 
-# 
-# 
-# mofa_baseline_comp %>%
-#   filter(feature == "chr1:994735-1006799") %>%
-#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-#   mutate(diff = (predicted - baseline)) %>%
-#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-#     ggplot() +
-#   geom_col(aes(x = sample, y = diff, fill = celltype)) +
-#   ggtitle("MOFA")
-# 
-# 
-# # Comparing with the diff of the actual and predicted values
-# mofa_baseline_comp %>%
-#   filter(feature == "chr1:994735-1006799") %>%
-#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-#   left_join(mofa_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
-#   mutate(diff = (actual - predicted)) %>%
-#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-#     ggplot() +
-#   geom_col(aes(x = sample, y = diff, fill = celltype)) 
-# 
-# stab_baseline_comp %>%
-#   filter(feature == "chr1:994735-1006799") %>%
-#   left_join(all_celltypes %>% rownames_to_column("sample")) %>%
-#   left_join(stab_imp_comp %>% filter(feature == "chr1:994735-1006799")) %>%
-#   mutate(diff = (actual - predicted)) %>%
-#   mutate(sample = factor(sample, levels = sample[order(all_celltypes$celltype)])) %>%
-#     ggplot() +
-#   geom_col(aes(x = sample, y = diff, fill = celltype))
-
-```

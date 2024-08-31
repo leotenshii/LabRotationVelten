@@ -136,12 +136,21 @@ for (i in 1:5) {
           return(df)
         }))
       
-      group_names <- rep(paste0("Dataset_",names(cell_split)), times = unlist(lapply(cell_split, length)))
+      a <- list()
       
-      model <- create_mofa(list(as.matrix(combined)), group_names = group_names)
+      # Loop to slice the combined dataframe into matrices of 500 rows each
+      for (i in 1:k) {
+        # Extract rows from (i*500 - 499) to (i*500) and convert to a matrix
+        matrix_slice <- as.matrix(combined[((i - 1) * nGenes + 1):(i * nGenes), ])
+        
+        # Append the matrix slice to the list
+        a[[i]] <- matrix_slice
+      }
       
-      mofa_parameter_train(num_factors = ifelse(nGenes <=50, 10, 50), model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model.hdf5")
-      trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/multihop_model.hdf5", remove_inactive_factors = FALSE)
+      model <- create_mofa(a)
+      
+      mofa_parameter_train(num_factors = ifelse(nGenes <=50, 10, 50), model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model2.hdf5")
+      trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/multihop_model2.hdf5", remove_inactive_factors = FALSE)
       
       # Celltype accuracy
       factors <- get_factors(trained_model)
@@ -172,11 +181,14 @@ for (i in 1:5) {
 }
 
 #---------------------------Save results----------------------------------------
-write.table(mofa_acc_df_all, file = "~/R/Data/mofa_multihop2.txt")
-write.table(stab_acc_df_all, file = "~/R/Data/stab_multihop2.txt")
+write.table(mofa_acc_df_all, file = "~/R/Data/mofa_multihop3.txt")
+#write.table(stab_acc_df_all, file = "~/R/Data/stab_multihop2.txt")
 
 stab_acc_df_all <- read.table("~/R/Data/stab_multihop.txt")
-mofa_acc_df_all <- read.table("~/R/Data/mofa_multihop.txt")
+mofa_acc_df_all <- read.table("~/R/Data/mofa_multihop2.txt")
+
+# stab_acc_df_all <- read.table("~/R/Data/stab_multihop2.txt")
+# mofa_acc_df_all <- read.table("~/R/Data/mofa_multihop2.txt")
 
 #---------------------------Plots-----------------------------------------------
 g1 = ggplot(subset(mofa_acc_df_all, Dataset != "Dataset_1"), aes(x = Dataset, y = acc)) + 
@@ -230,5 +242,7 @@ print(g1+g2+ g_leg) + plot_layout(widths = c(2,2,0.5))
 #                             scale.scale = FALSE)
 # 
 # mofa_parameter_train(num_factors = ifelse(nGenes <=50, 10, 50), model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model.hdf5")
+
+# Run 3 with list of matices in mofa
 
 

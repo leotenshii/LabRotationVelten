@@ -147,7 +147,6 @@ run_bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na
                      na_features = na_features,
                      na_cells = na_cells)
     
-    ##########
     rmse_atac <- NA
     rmse_rna <- NA
     

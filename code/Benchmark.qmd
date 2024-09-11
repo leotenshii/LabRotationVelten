@@ -296,7 +296,7 @@ stab_rmse <- rmse_imp(imp_data = imp$all_feat[na_features,],
 mofa_rmse<- rmse_imp(imp_data = trained_model@imputed_data$missing_feat[[1]][,na_cells],
                      real_data = logcounts_all_matrix, 
                      na_features = na_features, 
-                      na_cells = na_cells)
+                     na_cells = na_cells)
 
 cat(" StabMap RMSE:", stab_rmse, "\n", "MOFA RMSE:",mofa_rmse )
 ```

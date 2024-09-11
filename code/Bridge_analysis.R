@@ -72,6 +72,7 @@ run_bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na
   results <- data.frame()
   
   for (i in 1:length(bridge_size)) {
+    set.seed(42)
     current_bridge_size <- bridge_size[i]
     print(paste("Current bridge size:",  current_bridge_size))
     
@@ -88,8 +89,11 @@ run_bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na
                                 na_cells = na_cells,
                                 metadata = metadata)
       
-      trained_model <- mofa_parameter_train(num_factors = num_factor, spikeslab_weights = FALSE,
-                                            model = model)
+      mofa_parameter_train(num_factors = num_factor, 
+                           spikeslab_weights = FALSE,
+                           model = model, 
+                           path = "/home/hd/hd_hd/hd_fb235/R/Data/model3.hdf5")
+      trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/model3.hdf5", remove_inactive_factors = FALSE)
       
       trained_model <- run_umap(trained_model)
       
@@ -114,7 +118,8 @@ run_bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na
                       plot = FALSE,
                       scale.center = FALSE,
                       scale.scale = FALSE,
-                      maxFeatures = 1740)
+                      maxFeatures = 1740,
+                      projectAll = TRUE)
       
       coord <- as.data.frame(calculateUMAP(t(stab)))
       umap <- merge( coord, as.data.frame(metadata), by = 0) %>%
@@ -174,23 +179,23 @@ run_bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na
   write.table(results, file = outfile, row.names = FALSE)
 }
 
-# run_bridge_analysis("stab", c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), "/home/hd/hd_hd/hd_fb235/R/Data/stab_bridge.txt",
+# run_bridge_analysis("stab", c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), "/home/hd/hd_hd/hd_fb235/R/Data/stab_bridge1.txt",
 #                     metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, seperate_rmse = TRUE)
-# 
-# run_bridge_analysis("mofa", num_factor = 70, c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_70.txt",
-#                     metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, seperate_rmse = TRUE)
-# 
-# run_bridge_analysis("mofa", num_factor = 15, c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_15.txt",
-#                     metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all)
-# 
-# 
-# run_bridge_analysis("stab", rep(c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), each = 5), "/home/hd/hd_hd/hd_fb235/R/Data/stab_bridge_rand.txt",
-#                     metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, random_na_features = TRUE, random_na_features_list = na_features_list)
-# 
-# run_bridge_analysis("mofa", num_factor = 70, rep(c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), each = 5), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_70_rand.txt",
-#                     metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, random_na_features = TRUE, random_na_features_list = na_features_list)
 
-run_bridge_analysis("mofa", num_factor = 15, rep(c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), each = 5), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_15_rand.txt",
+run_bridge_analysis("mofa", num_factor = 70, c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_70_2.txt",
+                    metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, seperate_rmse = TRUE)
+
+run_bridge_analysis("mofa", num_factor = 15, c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_15_2.txt",
+                    metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all)
+
+
+run_bridge_analysis("stab", rep(c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), each = 5), "/home/hd/hd_hd/hd_fb235/R/Data/stab_bridge_rand1_2.txt",
+                    metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, random_na_features = TRUE, random_na_features_list = na_features_list)
+
+run_bridge_analysis("mofa", num_factor = 70, rep(c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), each = 5), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_70_rand_2.txt",
+                    metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, random_na_features = TRUE, random_na_features_list = na_features_list)
+
+run_bridge_analysis("mofa", num_factor = 15, rep(c(10, 52, 104, 156, 218, 438, 653, 870 ,953 ,1088, 1305, 1523, 1730), each = 5), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_bridge_15_rand_2.txt",
                     metadata = metadata, cluster = cluster, na_cells = na_cells, all_celltypes = all_celltypes, data = logcounts_all, random_na_features = TRUE, random_na_features_list = na_features_list)
 
 

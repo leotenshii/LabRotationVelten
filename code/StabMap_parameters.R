@@ -26,13 +26,14 @@ na_features <-  953:1740
 na_cells <- 1:5016
 
 param_grid <- expand.grid(
-  ncomponentsReference = c( 15, 30, 40, 50, 70), 
-  ncomponentsSubset = c( 15, 30, 40, 50, 70),
-  maxFeatures = c(1000, 1500, 1740, 2700), 
-  scale.center = c(TRUE, FALSE), 
+  ncomponentsReference = c( 10, 15, 20, 30, 40, 50, 60, 70),
+  ncomponentsSubset = c( 10, 15, 20, 30, 40, 50, 60, 70),
+  maxFeatures = c(1740),
+  scale.center = c(TRUE, FALSE),
   scale.scale = c(TRUE, FALSE),
-  project_all = c(TRUE, FALSE) 
+  project_all = c(TRUE, FALSE)
 )
+
 
 #---------------------------Dataset---------------------------------------------
 # Peripheral Blood Mononuclear Cells provided by 10x Genomics website
@@ -64,7 +65,6 @@ cluster <- as.data.frame(metadata) %>%
   summarise(n = n()) %>% 
   mutate(n = 1:14) 
 
-
 #---------------------------StabMap---------------------------------------------
 
 stab_list <- stab_build_model(data = logcounts_all_matrix, 
@@ -77,10 +77,11 @@ results <- list()
 
 #---------------------------Loop------------------------------------------------
 for (i in 1:nrow(param_grid)) {
+  set.seed(42)
   params <- param_grid[i, ]
   
   # When we want both PC to be the same
-  # params$ncomponentsSubset <- params$ncomponentsReference 
+  # params$ncomponentsSubset <- params$ncomponentsReference
   
   # Print current parameters 
   cat("Running stabMap with ncomponentsReference =", params$ncomponentsReference,
@@ -211,16 +212,16 @@ for (param_name in names(results)) {
 }
 
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison.txt")
+write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison1.txt")
 
 # For this file: 
-# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_numfactors.txt")
-# use 
+# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/stab_comparison_numfactors1.txt")
+# use
 # param_grid <- expand.grid(
-#   ncomponentsReference = c( 10, 15, 20, 30, 40, 50, 60, 70), 
-#   maxFeatures = c(1000), 
-#   scale.center = c(FALSE), 
+#   ncomponentsReference = c( 10, 15, 20, 30, 40, 50, 60, 70),
+#   maxFeatures = c(1740),
+#   scale.center = c(FALSE),
 #   scale.scale = c(FALSE),
-#   project_all = c(FALSE) 
+#   project_all = c(TRUE)
 # )
-# and uncomment line 77
+# and uncomment line 84

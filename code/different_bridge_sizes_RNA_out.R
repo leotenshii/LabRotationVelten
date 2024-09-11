@@ -61,6 +61,20 @@ na_features_ATAC <- 953:1740
 na_cells_ATAC <- 1:5016
 na_cells_RNA <- 5017:10032
 
+# Random NA features
+# na_features_list <- list()
+# bridge_size <- c(10, 56, 112, 167, 238, 476, 714, 942)
+# for (i in 1:length(bridge_size)) {
+#   current_bridge_size <- bridge_size[i]
+#   for (j in 1:3) {  
+#     na_features_rand <- sample(952, (952-current_bridge_size))
+#     na_features_list <- append(na_features_list, list(na_features_rand))
+#   }
+# }
+
+na_features_list <- dget("~/R/Data/my_list.txt")
+
+
 #---------------------------Model functions-------------------------------------
 # I need to rewrite thme to be able to handle to regions of values missing. They work otherwise the same as before
 mofa_build_model_2 <- function(data, na_features_ATAC, na_cells_ATAC, na_features_RNA, na_cells_RNA, metadata) {
@@ -100,10 +114,11 @@ bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na_cel
   results <- data.frame()
   
   for (i in 1:length(bridge_size)) {
+    set.seed(42)
     current_bridge_size <- bridge_size[i]
     print(paste("Current bridge size:", current_bridge_size))
     
-    na_features_RNA <-  1:(952 - current_bridge_size)
+    na_features_RNA <- na_features_list[[i]]
     
     if (method == "mofa") {
       model <- mofa_build_model_2(data = data,
@@ -113,8 +128,11 @@ bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na_cel
                                 na_cells_RNA = na_cells_RNA,
                                 metadata = metadata)
       
-      trained_model <- mofa_parameter_train(num_factors = 70, spikeslab_weights = FALSE,
-                                            model = model)
+      mofa_parameter_train(num_factors = 70, 
+                           spikeslab_weights = FALSE,
+                           model = model, 
+                           path = "/home/hd/hd_hd/hd_fb235/R/Data/model4.hdf5")
+      trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/model4.hdf5", remove_inactive_factors = FALSE)
       
       trained_model <- run_umap(trained_model)
       
@@ -142,7 +160,8 @@ bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na_cel
                       plot = FALSE,
                       scale.center = FALSE,
                       scale.scale = FALSE,
-                      maxFeatures = 1740)
+                      maxFeatures = 1740,
+                      projectAll = TRUE)
       
       coord <- as.data.frame(calculateUMAP(t(stab)))
       umap <- merge( coord, as.data.frame(metadata), by = 0) %>%
@@ -185,11 +204,11 @@ bridge_analysis <- function(method, bridge_size, outfile, data, metadata, na_cel
 }
 
 
-bridge_analysis("mofa", c(10, 56, 112, 167, 233, 476, 709, 942), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_RNA_out_15.txt",
-                    metadata = metadata, cluster = cluster, na_cells_ATAC = na_cells_ATAC, na_cells_RNA = na_cells_RNA, na_features_ATAC = na_features_ATAC, all_celltypes = all_celltypes, data = logcounts_all, num_factor = 15)
+# bridge_analysis("mofa", rep(c(10, 56, 112, 167, 238, 476, 714, 942), each = 3), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_RNA_out_15_2.txt",
+#                     metadata = metadata, cluster = cluster, na_cells_ATAC = na_cells_ATAC, na_cells_RNA = na_cells_RNA, na_features_ATAC = na_features_ATAC, all_celltypes = all_celltypes, data = logcounts_all, num_factor = 15)
 
-bridge_analysis("mofa", c(10, 56, 112, 167, 233, 476, 709, 942), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_RNA_out_70.txt",
-                    metadata = metadata, cluster = cluster, na_cells_ATAC = na_cells_ATAC, na_cells_RNA = na_cells_RNA, na_features_ATAC = na_features_ATAC, all_celltypes = all_celltypes, data = logcounts_all, num_factor = 70)
+# bridge_analysis("mofa", rep(c(10, 56, 112, 167, 238, 476, 714, 942), each = 3), "/home/hd/hd_hd/hd_fb235/R/Data/mofa_RNA_out_70_2.txt",
+#                     metadata = metadata, cluster = cluster, na_cells_ATAC = na_cells_ATAC, na_cells_RNA = na_cells_RNA, na_features_ATAC = na_features_ATAC, all_celltypes = all_celltypes, data = logcounts_all, num_factor = 70)
 
-bridge_analysis("stab", c(10, 56, 112, 167, 233, 476, 709, 942 ), "/home/hd/hd_hd/hd_fb235/R/Data/stab_RNA_out.txt",
+bridge_analysis("stab", rep(c(10, 56, 112, 167, 238, 476, 714, 942), each = 3), "/home/hd/hd_hd/hd_fb235/R/Data/stab_RNA_out_2.txt",
                     metadata = metadata, cluster = cluster, na_cells_ATAC = na_cells_ATAC, na_cells_RNA = na_cells_RNA, na_features_ATAC = na_features_ATAC, all_celltypes = all_celltypes, data = logcounts_all)

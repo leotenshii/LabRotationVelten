@@ -75,6 +75,12 @@ param_grid <- expand.grid(
   spikeslab_weights = c(TRUE, FALSE)
 )
 
+# param_grid <- expand.grid(
+#   scale_views = c(FALSE),
+#   num_factors = c(10, 15, 20, 30, 40, 50, 60, 70),
+#   spikeslab_weights = c(FALSE)
+# )
+
 
 
 
@@ -108,6 +114,7 @@ results <- list()
 
 #---------------------------Loop------------------------------------------------
 for (i in 1:nrow(param_grid)) {
+  set.seed(42)
   params <- param_grid[i, ]
   
   # Print current parameters 
@@ -117,11 +124,12 @@ for (i in 1:nrow(param_grid)) {
       # ", spikeslab_factors =", params$spikeslab_factors,
       ", spikeslab_weights =", params$spikeslab_weights)
   
-  mofa_results <- mofa_parameter_train(scale_views = params$scale_views, num_factors = params$num_factors, spikeslab_weights = params$spikeslab_weights, model, return_time = TRUE)
+  mofa_results <- mofa_parameter_train(scale_views = params$scale_views, num_factors = params$num_factors, spikeslab_weights = params$spikeslab_weights, model, return_time = TRUE, path = "/home/hd/hd_hd/hd_fb235/R/Data/model_par.hdf5")
+  trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/model_par.hdf5", remove_inactive_factors = FALSE)
   
   # Run MOFA with current parameters
   time_integration_all <- mofa_results[[1]]
-  trained_model <- mofa_results[[2]]
+
   
 
   # UMAP
@@ -242,10 +250,10 @@ for (param_name in names(results)) {
 
 print(comparison)
 
-write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison.txt")
+ write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison1.txt")
 
 # For this file:
-# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_numfactors.txt")
+# write.table(comparison, file = "/home/hd/hd_hd/hd_fb235/R/Data/mofa_comparison_numfactors2.txt")
 # change to:
 # param_grid <- expand.grid(
 #   scale_views = c(FALSE),

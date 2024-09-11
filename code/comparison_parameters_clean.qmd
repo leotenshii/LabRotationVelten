@@ -100,8 +100,7 @@ stability_rand_NAcells_barplot <- function(data, mofa_metric, mofa_sd, stab_metr
 
 ```{r}
 # MOFA
-mofa_param_comparison <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE) %>%
-  select(-mofa_mae)
+mofa_param_comparison <- read.table("~/R/Data/mofa_comparison.txt", header = TRUE) 
 
 mofa_comparison_set_param  <- read.table("~/R/Data/mofa_comparison_numfactors.txt", header = TRUE)
 
@@ -112,9 +111,7 @@ mofa_rand_NAcells <- read.table("~/R/Data/mofa_random_cells_NA_15.txt", header =
 
 
 # StabMap
-stab_param_comparison <- read.table("~/R/Data/stab_comparison.txt", header = TRUE)%>%
-  select(-stab_mae)
-
+stab_param_comparison <- read.table("~/R/Data/stab_comparison.txt", header = TRUE)
 stab_comparison_set_param  <- read.table("~/R/Data/stab_comparison_numfactors.txt") %>%
   mutate(num_pc = ncomponentsReference)
 
@@ -143,7 +140,7 @@ print(mofa_plot_metric_for_diff_factors(mofa_param_comparison, num_factor, mean_
 print(stab_plot_metric_for_diff_factors(stab_param_comparison, mean_sil_score, col = stab_param_comparison$scale.scale, 
                                         title = "Mean silhouette score for different number of components", x = "Number of reference components", y = "Mean silhouette score") +
       stab_plot_metric_for_diff_factors(stab_param_comparison, stab_knn_acc_bal, 
-                                        title = "Mean mofa_knn_acc_bal for different number of components", x = "Number of reference components", y = "Mean stab_knn_acc_bal") +
+                                        title = "Mean stab_knn_acc_bal for different number of components", x = "Number of reference components", y = "Mean stab_knn_acc_bal") +
       stab_plot_metric_for_diff_factors(stab_param_comparison, stab_rmse, 
                                         title = "Mean RMSE for different number of components", x = "Number of reference components", y = "Mean RMSE") +
       plot_annotation(title = 'Influence of different number of components for integration and imputation with StabMap'))
@@ -170,7 +167,7 @@ for (j in 1:3) {
 # StabMap
 for (j in 1:6) {
   par_name <- rlang::sym(colnames(stab_param_comparison)[j])
-  for (i in 1:8) {
+  for (i in 1:6) {
     var_name <- rlang::sym(colnames(stab_param_comparison)[6+i])
     print(mofa_plot_metric_for_diff_factors(stab_param_comparison, !!par_name, !!var_name, 
                                             title = paste("Mean", var_name, "for different number of components"), x = par_name, y = paste("Mean", var_name)))
@@ -181,19 +178,19 @@ for (j in 1:6) {
 Results for MOFA:
 
 | Parameter         | Integration                              | Imputation                                               | Optimal setting |
-|-------------------|------------------------------------------|----------------------------------------------------------|-----------------|
+|--------------|------------------|--------------------------|--------------|
 | scale_views       | Slightly better when FALSE               | Slightly better when TRUE, but insignificant difference  | FALSE           |
 | spikeslab_weights | Mixed results, overall better when FALSE | Slightly better when FALSE, but insignificant difference | FALSE           |
 
 Results for StabMap:
 
 | Parameter    | Integration              | Imputation               | Optimal setting                                                        |
-|--------------|--------------------------|--------------------------|------------------------------------------------------------------------|
+|--------------|--------------|--------------|--------------------------------|
 | PC Subset    | Insignificant difference | Insignificant difference | Same number as PC reference (since both have the same amount of cells) |
-| maxFeatures  | <!--# Maybe rerun -->    |                          | <!--# Maybe all? Didnt test it for MOFA -->                            |
+| maxFeatures  | \-                       | \-                       | Not analyzed since feature selection is done before.                   |
 | scale.center | Better when TRUE         | Better when TRUE         | FALSE                                                                  |
 | scale.scale  | Better when FALSE        | Better when FALSE        | FALSE                                                                  |
-| project_all  | Better when TRUE         | Better when FALSE        | FALSE                                                                  |
+| project_all  | Better when TRUE         | Better when FALSE        | TRUE (to keep it comparable with MOFA)                                 |
 
 I set all scaling parameters to FALSE to keep both methods comparable.
 
@@ -201,9 +198,9 @@ Another way to visualize:\
 
 ```{r}
 # MOFA
-metrics <- c("mean_sil_score", "mofa_rmse")
+metrics <- c("mean_sil_score", "mofa_rmse", "mofa_knn_acc_bal")
 
-for (j in 1:2) {
+for (j in 1:3) {
   metric <- metrics[j]
   for (i in c(1,3)) {
     var_name <- colnames(mofa_param_comparison)[i]
@@ -230,9 +227,9 @@ for (j in 1:2) {
 }
 
 # StabMap
-metrics <- c("mean_sil_score", "stab_rmse")
+metrics <- c("mean_sil_score", "stab_rmse", "stab_knn_acc_bal")
 
-for (j in 1:2) {
+for (j in 1:3) {
   metric <- metrics[j]
   for (i in 1:5) {
     var_name <- colnames(stab_param_comparison)[1 + i]
@@ -278,7 +275,11 @@ mofa_table_2 <- data.frame(
       max_value = c(
         max(mofa_param_comparison$mean_sil_score),
         max(mofa_param_comparison$mofa_knn_acc_bal),
-        min(mofa_param_comparison$mofa_rmse))) %>%
+        min(mofa_param_comparison$mofa_rmse)),
+      min_value = c(
+        min(mofa_param_comparison$mean_sil_score),
+        min(mofa_param_comparison$mofa_knn_acc_bal),
+        max(mofa_param_comparison$mofa_rmse))) %>%
       mutate(diff = max_value - values_selected_parameters )
 
 mofa_table_2
@@ -286,7 +287,7 @@ mofa_table_2
 
 ```{r}
 stab_table <- stab_param_comparison %>%
-  filter(scale.scale == FALSE, scale.center == FALSE, ncomponentsReference == 70, ncomponentsSubset == 70, project_all == FALSE, maxFeatures == 1000) 
+  filter(scale.scale == FALSE, scale.center == FALSE, ncomponentsReference == 70, ncomponentsSubset == 70, project_all == TRUE, maxFeatures == 1740) 
 
 stab_table_2 <- data.frame(
     metric = c("mean_sil_score", "stab_knn_acc_bal", "stab_rmse"),
@@ -297,7 +298,11 @@ stab_table_2 <- data.frame(
     max_value = c(
       max(stab_param_comparison$mean_sil_score),
       max(stab_param_comparison$stab_knn_acc_bal),
-      min(stab_param_comparison$stab_rmse))) %>%
+      min(stab_param_comparison$stab_rmse)),
+    min_value = c(
+      min(stab_param_comparison$mean_sil_score),
+      min(stab_param_comparison$stab_knn_acc_bal),
+      max(stab_param_comparison$stab_rmse))) %>%
     mutate(diff = max_value - values_selected_parameters )
 
 stab_table_2
@@ -315,7 +320,7 @@ tibble(
 )
 ```
 
-MOFA has better results for all three metrics.
+MOFA has better results for imputation and celltype accuracy, StabMap at the silhouette width.
 
 ## Metrics for different num of factors with set parameters
 
@@ -342,15 +347,15 @@ The following figures depict a comparison of the metric trends between MOFA and 
 ```{r}
 compare_methods(mofa_comparison_set_param , mofa_param = num_factor, mofa_metric = mean_sil_score, 
                 stab_comparison_set_param , stab_param = num_pc, stab_metric = mean_sil_score,
-                x = "Number factors/PC", y = "Mean silhouette score")
+                x = "Number factors/PC", y = "Mean silhouette score", colour = "Tool")
 
 compare_methods(mofa_comparison_set_param , mofa_param = num_factor, mofa_metric = mofa_knn_acc_bal, 
                 stab_comparison_set_param , stab_param = num_pc, stab_metric = stab_knn_acc_bal,
-                x = "Number factors/PC", y = "Celltype accuracy")
+                x = "Number factors/PC", y = "Celltype accuracy", colour = "Tool")
 
 compare_methods(mofa_comparison_set_param , mofa_param = num_factor, mofa_metric = mofa_rmse, 
                 stab_comparison_set_param , stab_param = num_pc, stab_metric = stab_rmse,
-                x = "Number factors/PC", y = "RMSE")
+                x = "Number factors/PC", y = "RMSE", colour = "Tool")
 ```
 
 ## Random NA cells
@@ -365,10 +370,10 @@ random_NA_both <- cbind(
                     summarize(
                       stab_mean_sil_score_mean = mean(mean_sil_score), 
                       stab_mean_sil_score_sd = sd(mean_sil_score),
-                      stab_knn_acc_bal_mean = mean(stab_knn_acc_bal), 
-                      stab_knn_acc_bal_sd = sd(stab_knn_acc_bal), 
-                      stab_rmse_mean = mean(stab_rmse), 
-                      stab_rmse_sd = sd(stab_rmse)
+                      stab_knn_acc_bal_mean = mean(knn_acc_bal), 
+                      stab_knn_acc_bal_sd = sd(knn_acc_bal), 
+                      stab_rmse_mean = mean(rmse), 
+                      stab_rmse_sd = sd(rmse)
                     ) ,
                     mofa_rand_NAcells %>%
                     summarize(
@@ -391,11 +396,11 @@ stability_rand_NAcells_barplot(random_NA_both,
                   y = "Mean silhouette width")
 
 stability_rand_NAcells_barplot(random_NA_both, 
-                  mofa_metric = mofa_knn_acc_bal_mean,
-                  mofa_sd = mofa_knn_acc_bal_sd,
-                  stab_metric = stab_knn_acc_bal_mean,
-                  stab_sd = stab_knn_acc_bal_sd, 
-                  y = "Mean Celltype Accuracy")
+                  mofa_metric = mofa_knn_acc_bal_mean *100,
+                  mofa_sd = mofa_knn_acc_bal_sd*100,
+                  stab_metric = stab_knn_acc_bal_mean*100,
+                  stab_sd = stab_knn_acc_bal_sd*100, 
+                  y = "Mean Celltype Accuracy [%]")
 
 stability_rand_NAcells_barplot(random_NA_both, 
                   mofa_metric = mofa_rmse_mean,
@@ -488,8 +493,11 @@ mofa_bridge_rand <- read.table("~/R/Data/mofa_bridge_15_rand.txt", header = TRUE
   cbind(rmse = mofa_bridge_rand_70$rmse) 
 stab_bridge_rand <- read.table("~/R/Data/stab_bridge_rand.txt", header = TRUE)
 
-mofa_incomp_ref_15 <- read.table("~/R/Data/mofa_RNA_out_15.txt", header = TRUE)
 mofa_incomp_ref_70 <- read.table("~/R/Data/mofa_RNA_out_70.txt", header = TRUE)
+mofa_incomp_ref_15 <- read.table("~/R/Data/mofa_RNA_out_15.txt", header = TRUE) %>%
+  select(-c(rmse_ATAC, rmse_RNA)) %>%
+  cbind(rmse_ATAC = mofa_incomp_ref_70$rmse_ATAC) %>%
+  cbind(rmse_RNA = mofa_incomp_ref_70$rmse_RNA)
 stab_incomp_ref <- read.table("~/R/Data/stab_RNA_out.txt", header = TRUE)
 ```
 
@@ -594,18 +602,35 @@ MOFA once again outperforms StabMap.
 
 Data generated by `different_bridge_sizes_RNA_out.R`
 
-Up to this point, the reference dataset comprised the full range of features. In this section, the effect of an incomplete reference dataset is tested. The query will still miss the ATAC features, but now the reference will start missing different numbers of RNA features. RNA bridges of varying sizes are applied: 10, 56, 112, 167, 233, 476, 709, and 942 (in total 952 RNA features). Here are the trends for the three metrics:
+Up to this point, the reference dataset comprised the full range of features. In this section, the effect of an incomplete reference dataset is tested. The query will still miss the ATAC features, but now the reference will start missing different numbers of (randomly selected) RNA features. RNA bridges of varying sizes are applied: 10, 56, 112, 167, 233, 476, 709, and 942 (in total 952 RNA features). Here are the trends for the three metrics:
 
 ```{r}
-plot_metric_trend(mofa_incomp_ref_15, bridge_size, mean_sil_score)
-plot_metric_trend(mofa_incomp_ref_15, bridge_size, knn_acc_bal)
-plot_metric_trend(mofa_incomp_ref_70, bridge_size, rmse_ATAC)
-plot_metric_trend(mofa_incomp_ref_70, bridge_size, rmse_RNA)
+mofa_incomp_ref_15_summ <- mofa_incomp_ref_15 %>% group_by(bridge_size) %>%
+                    summarize(
+                      mean_sil_score_mean = mean(mean_sil_score), 
+                      knn_acc_bal_mean = mean(knn_acc_bal),
+                      rmse_ATAC_mean = mean(rmse_ATAC), 
+                      rmse_RNA_mean = mean(rmse_RNA), 
+                    ) 
 
-plot_metric_trend(stab_incomp_ref, bridge_size, mean_sil_score)
-plot_metric_trend(stab_incomp_ref, bridge_size, knn_acc_bal)
-plot_metric_trend(stab_incomp_ref, bridge_size, rmse_ATAC)
-plot_metric_trend(stab_incomp_ref, bridge_size, rmse_RNA)
+stab_incomp_ref_summ <- stab_incomp_ref %>%
+  group_by(bridge_size) %>%
+                    summarize(
+                      mean_sil_score_mean = mean(mean_sil_score), 
+                      knn_acc_bal_mean = mean(knn_acc_bal),
+                      rmse_ATAC_mean = mean(rmse_ATAC), 
+                      rmse_RNA_mean = mean(rmse_RNA), 
+                    )
+
+plot_metric_trend(mofa_incomp_ref_15_summ, bridge_size, mean_sil_score_mean)
+plot_metric_trend(mofa_incomp_ref_15_summ, bridge_size, knn_acc_bal_mean)
+plot_metric_trend(mofa_incomp_ref_15_summ, bridge_size, rmse_ATAC_mean)
+plot_metric_trend(mofa_incomp_ref_15_summ, bridge_size, rmse_RNA_mean)
+
+plot_metric_trend(stab_incomp_ref_summ, bridge_size, mean_sil_score_mean)
+plot_metric_trend(stab_incomp_ref_summ, bridge_size, knn_acc_bal_mean)
+plot_metric_trend(stab_incomp_ref_summ, bridge_size, rmse_ATAC_mean)
+plot_metric_trend(stab_incomp_ref_summ, bridge_size, rmse_RNA_mean)
 ```
 
 As the bridge size increases, both the integration and imputation metrics demonstrate a corresponding improvement, with the former rising and the latter falling. This suggests that both tools are more effective when utilised with larger bridges.
@@ -613,21 +638,21 @@ As the bridge size increases, both the integration and imputation metrics demons
 Comparison:
 
 ```{r}
-compare_methods(mofa_data = mofa_incomp_ref_15, mofa_param = bridge_size, mofa_metric = mean_sil_score,
-                stab_data = stab_incomp_ref, stab_param = bridge_size, stab_metric = mean_sil_score,
+compare_methods(mofa_data = mofa_incomp_ref_15_summ, mofa_param = bridge_size, mofa_metric = mean_sil_score_mean,
+                stab_data = stab_incomp_ref_summ, stab_param = bridge_size, stab_metric = mean_sil_score_mean,
                 x = "bridge size", y = "Mean silhouette score")
 
-compare_methods(mofa_data = mofa_incomp_ref_15, mofa_param = bridge_size, mofa_metric = knn_acc_bal,
-                stab_data = stab_incomp_ref, stab_param = bridge_size, stab_metric = knn_acc_bal,
+compare_methods(mofa_data = mofa_incomp_ref_15_summ, mofa_param = bridge_size, mofa_metric = knn_acc_bal_mean,
+                stab_data = stab_incomp_ref_summ, stab_param = bridge_size, stab_metric = knn_acc_bal_mean,
                 x = "bridge size", y = "Celltype accuracy")
 
-compare_methods(mofa_data = mofa_incomp_ref_70, mofa_param = bridge_size, mofa_metric = rmse_ATAC,
-                stab_data = stab_incomp_ref, stab_param = bridge_size, stab_metric = rmse_ATAC,
+compare_methods(mofa_data = mofa_incomp_ref_15_summ, mofa_param = bridge_size, mofa_metric = rmse_ATAC_mean,
+                stab_data = stab_incomp_ref_summ, stab_param = bridge_size, stab_metric = rmse_ATAC_mean,
                 x = "bridge size", y = "RMSE ATAC")
 
-compare_methods(mofa_data = mofa_incomp_ref_70, mofa_param = bridge_size, mofa_metric = rmse_RNA,
-                stab_data = stab_incomp_ref, stab_param = bridge_size, stab_metric = rmse_RNA,
+compare_methods(mofa_data = mofa_incomp_ref_15_summ, mofa_param = bridge_size, mofa_metric = rmse_RNA_mean,
+                stab_data = stab_incomp_ref_summ, stab_param = bridge_size, stab_metric = rmse_RNA_mean,
                 x = "bridge size", y = "RMSE RNA")
 ```
 
-The MOFA method typically produces more accurate results than StabMap, with the exception of the RNA-RMSE metric. In instances where the bridge length is relatively short (up to 56), StabMap demonstrates superior performance when imputing RNA features.
+The MOFA method typically produces more accurate results than StabMap, with the exception of the RNA-RMSE and celltype accuracy metric. When the bridge length is relatively short (56 and up to 56, respectively), StabMap demonstrates superior performances in these cases.

@@ -43,14 +43,17 @@ atlas <- atlas[hvgs,]
 # record the cell type classification accuracy.
 
 k = 8
-nGenes_all = c(100, 200, 500, 1000)
-nCells_all = c(500, 1000, 2000)
+# nGenes_all = c(100, 200, 500, 1000)
+# nCells_all = c(500, 1000, 2000)
+
+nGenes_all = c(100, 1000)
+nCells_all = c(500, 2000)
 labels = "celltype"
 
 stab_acc_df_all = NULL
 mofa_acc_df_all = NULL
 
-for (i in 1:5) {
+for (i in 1:1) {
   
   for (nCells in nCells_all) {
     
@@ -147,15 +150,23 @@ for (i in 1:5) {
         a[[i]] <- matrix_slice
       }
       
-      model <- create_mofa(a)
+      a_scaled <- lapply(
+        a,
+        function(x) t(scale(t(x), center = TRUE, scale = TRUE))
+      )
+      
+      model <- create_mofa(a_scaled)
       
       mofa_parameter_train(num_factors = ifelse(nGenes <=50, 10, 50), model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model2.hdf5")
       trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/multihop_model2.hdf5", remove_inactive_factors = FALSE)
       
       # Celltype accuracy
-      factors <- get_factors(trained_model)
+      # factors <- get_factors(trained_model)
+      trained_model <- run_umap(trained_model)
+      mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
       
-      mofa_knn_out = embeddingKNN(factors$group1,
+      mofa_knn_out = embeddingKNN(mofa_umap_coord,
+        #factors$group1,
                                   labels_train,
                                   type = "uniform_fixed",
                                   k_values = 5)
@@ -181,68 +192,43 @@ for (i in 1:5) {
 }
 
 #---------------------------Save results----------------------------------------
-write.table(mofa_acc_df_all, file = "~/R/Data/mofa_multihop3.txt")
-#write.table(stab_acc_df_all, file = "~/R/Data/stab_multihop2.txt")
+write.table(mofa_acc_df_all, file = "~/R/Data/mofa_multihop.txt")
+write.table(stab_acc_df_all, file = "~/R/Data/stab_multihop.txt")
 
 stab_acc_df_all <- read.table("~/R/Data/stab_multihop.txt")
-mofa_acc_df_all <- read.table("~/R/Data/mofa_multihop2.txt")
-
-# stab_acc_df_all <- read.table("~/R/Data/stab_multihop2.txt")
-# mofa_acc_df_all <- read.table("~/R/Data/mofa_multihop2.txt")
+mofa_acc_df_all <- read.table("~/R/Data/mofa_multihop.txt")
 
 #---------------------------Plots-----------------------------------------------
-g1 = ggplot(subset(mofa_acc_df_all, Dataset != "Dataset_1"), aes(x = Dataset, y = acc)) + 
+g1 = ggplot(subset(mofa_acc_df_all, Dataset != "Dataset_1"), aes(x = Dataset, y = acc*100)) + 
   geom_line(aes(colour = factor(nGenes), group = rep), alpha = 0.1) + 
   geom_point(aes(colour = factor(nGenes), group = rep), alpha = 0.1) + 
   geom_smooth(aes(fill = factor(nGenes), group = factor(nGenes), colour = factor(nGenes)), alpha = 0.3) +
   facet_wrap(~nCells, nrow = 1, labeller = labeller(nCells = function(x) paste0(x, " cells per dataset"))) + 
-  ylab("Accuracy") +
+  ylab("Celltype accuracy [%]") +
   xlab("Dataset") +
   theme_classic() + 
   theme(legend.position = "none") +
-  theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), axis.text=element_text(size=14),axis.title=element_text(size=16,face="bold")) + 
+  scale_y_continuous(limits = c(0, 55), breaks = seq(0, 55, 10) ) + 
   lightness(scale_colour_brewer(palette = 1, aesthetics = c("colour", "fill")), scalefac(0.7)) +
   NULL
 
-g2 = ggplot(subset(stab_acc_df_all, Dataset != "Dataset_1"), aes(x = Dataset, y = acc)) + 
+g2 = ggplot(subset(stab_acc_df_all, Dataset != "Dataset_1"), aes(x = Dataset, y = acc*100)) + 
   geom_line(aes(colour = factor(nGenes), group = rep), alpha = 0.1) + 
   geom_point(aes(colour = factor(nGenes), group = rep), alpha = 0.1) + 
   geom_smooth(aes(fill = factor(nGenes), group = factor(nGenes), colour = factor(nGenes)), alpha = 0.3) +
   facet_wrap(~nCells, nrow = 1, labeller = labeller(nCells = function(x) paste0(x, " cells per dataset"))) + 
-  ylab("Accuracy") +
+  ylab("Celltype accuracy [%]") +
   xlab("Dataset") +
   theme_classic() + 
   theme(legend.position = "none") +
-  theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), axis.text=element_text(size=14),axis.title=element_text(size=16,face="bold")) + 
+  scale_y_continuous(limits = c(0, 55), breaks = seq(0, 55, 10) ) + 
   lightness(scale_colour_brewer(palette = 1, aesthetics = c("colour", "fill")), scalefac(0.7)) +
   NULL
 
 g_leg = as_ggplot(get_legend(g1 + theme(legend.position = "right") + guides(colour = guide_legend(title = "Number of genes \n per dataset"),
                                                                            fill = guide_legend(title = "Number of genes \n per dataset"))))
-print(g1+g2+ g_leg) + plot_layout(widths = c(2,2,0.5))
-
-
-#---------------------------Runs------------------------------------------------
-# Run 1:
-# StabMap_embedding = stabMap(assay_list,
-#                             reference_list = "Dataset_1",
-#                             ncomponentsReference = nPCs,
-#                             ncomponentsSubset = nPCs,
-#                             projectAll = TRUE)
-# 
-# mofa_parameter_train(model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model.hdf5")
-
-# Run 2:
-# StabMap_embedding = stabMap(assay_list,
-#                             reference_list = "Dataset_1",
-#                             ncomponentsReference = nPCs,
-#                             ncomponentsSubset = nPCs,
-#                             projectAll = TRUE,
-#                             scale.center = FALSE,
-#                             scale.scale = FALSE)
-# 
-# mofa_parameter_train(num_factors = ifelse(nGenes <=50, 10, 50), model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model.hdf5")
-
-# Run 3 with list of matices in mofa
+print(g2+g1+ g_leg) + plot_layout(widths = c(2,2,0.5))
 
 

@@ -67,6 +67,7 @@ run_NAcells_analysis <- function(method, num_factors, outfile) {
   results <- data.frame()
   
   for (i in 1:length(na_cells_list)) {
+    set.seed(42)
     
     na_cells <- na_cells_list[[i]]
 
@@ -77,9 +78,11 @@ run_NAcells_analysis <- function(method, num_factors, outfile) {
                                 na_cells = na_cells, 
                                 na_features = na_features)
       
-      trained_model <- mofa_parameter_train(num_factors = num_factors, 
-                                            model = model, 
-                                            spikeslab_weights = FALSE)
+      mofa_parameter_train(num_factors = num_factors, 
+                           model = model, 
+                           spikeslab_weights = FALSE, 
+                           path = "/home/hd/hd_hd/hd_fb235/R/Data/model2.hdf5")
+      trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/model2.hdf5", remove_inactive_factors = FALSE)
       
       # UMAP
       trained_model <- run_umap(trained_model)
@@ -108,7 +111,8 @@ run_NAcells_analysis <- function(method, num_factors, outfile) {
                      reference_list = c("all_feat"),
                      plot = FALSE,
                      scale.center = FALSE,
-                     scale.scale = FALSE)
+                     scale.scale = FALSE,
+                     projectAll = TRUE)
       
       # UMAP
       umap_coord <- as.data.frame(calculateUMAP(t(stab)))
@@ -156,10 +160,10 @@ run_NAcells_analysis <- function(method, num_factors, outfile) {
   write.table(results, file = outfile, row.names = FALSE)
 }
 
-run_NAcells_analysis("mofa", 15, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_15.txt")
-run_NAcells_analysis("mofa", 70, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_70.txt")
+run_NAcells_analysis("mofa", 15, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_15_2.txt")
+run_NAcells_analysis("mofa", 70, "/home/hd/hd_hd/hd_fb235/R/Data/mofa_random_cells_NA_70_2.txt")
 
-run_NAcells_analysis("stab", 70, "/home/hd/hd_hd/hd_fb235/R/Data/r.txt")
+run_NAcells_analysis("stab", 70, "/home/hd/hd_hd/hd_fb235/R/Data/stab_random_cells_NA1.txt")
 
 
 

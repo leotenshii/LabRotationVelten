@@ -43,17 +43,15 @@ atlas <- atlas[hvgs,]
 # record the cell type classification accuracy.
 
 k = 8
-# nGenes_all = c(100, 200, 500, 1000)
-# nCells_all = c(500, 1000, 2000)
 
-nGenes_all = c(100, 1000)
-nCells_all = c(500, 2000)
+nGenes_all = c(100, 200, 500, 1000)
+nCells_all = c(500, 1000, 2000)
 labels = "celltype"
 
 stab_acc_df_all = NULL
 mofa_acc_df_all = NULL
 
-for (i in 1:1) {
+for (i in 1:5) {
   
   for (nCells in nCells_all) {
     
@@ -139,34 +137,31 @@ for (i in 1:1) {
           return(df)
         }))
       
-      a <- list()
+      mofa_list <- list()
       
-      # Loop to slice the combined dataframe into matrices of 500 rows each
+      
       for (i in 1:k) {
-        # Extract rows from (i*500 - 499) to (i*500) and convert to a matrix
+ 
         matrix_slice <- as.matrix(combined[((i - 1) * nGenes + 1):(i * nGenes), ])
-        
-        # Append the matrix slice to the list
-        a[[i]] <- matrix_slice
+
+        mofa_list[[i]] <- matrix_slice
       }
       
-      a_scaled <- lapply(
-        a,
+      mofa_list_scaled <- lapply(
+        mofa_list,
         function(x) t(scale(t(x), center = TRUE, scale = TRUE))
       )
       
-      model <- create_mofa(a_scaled)
+      model <- create_mofa(mofa_list_scaled)
       
       mofa_parameter_train(num_factors = ifelse(nGenes <=50, 10, 50), model = model, spikeslab_weights = FALSE, path = "/home/hd/hd_hd/hd_fb235/R/Data/multihop_model2.hdf5")
       trained_model <- load_model("/home/hd/hd_hd/hd_fb235/R/Data/multihop_model2.hdf5", remove_inactive_factors = FALSE)
       
       # Celltype accuracy
-      # factors <- get_factors(trained_model)
       trained_model <- run_umap(trained_model)
       mofa_umap_coord <- trained_model@dim_red$UMAP %>% select(UMAP1, UMAP2)
       
       mofa_knn_out = embeddingKNN(mofa_umap_coord,
-        #factors$group1,
                                   labels_train,
                                   type = "uniform_fixed",
                                   k_values = 5)
